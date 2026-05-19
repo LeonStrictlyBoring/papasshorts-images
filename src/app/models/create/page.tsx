@@ -3,7 +3,7 @@ export default function ModelCreatePage() {
     <div className="max-w-3xl">
       <h1 className="text-3xl font-bold text-navy mb-8">Model erstellen</h1>
 
-      <form className="space-y-10">
+      <form className="space-y-20">
         {/* Persona */}
         <section className="space-y-4">
           <h3 className="text-base font-bold text-navy uppercase tracking-wide">Persona</h3>

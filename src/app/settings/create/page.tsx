@@ -39,7 +39,7 @@ export default function SettingCreatePage() {
     <div className="max-w-3xl">
       <h1 className="text-3xl font-bold text-navy mb-8">Setting erstellen</h1>
 
-      <form className="space-y-10">
+      <form className="space-y-20">
 
         {/* Beschreibung */}
         <section className="space-y-4">
@@ -65,13 +65,14 @@ export default function SettingCreatePage() {
                   value="indoor"
                   checked={locationType === 'indoor'}
                   onChange={() => setLocationType('indoor')}
+                  onClick={() => locationType === 'indoor' && setLocationType(null)}
                   className="w-4 h-4 accent-orange"
                 />
                 <span className="text-navy font-medium">Indoor / Innenraum</span>
               </label>
 
               {locationType === 'indoor' && (
-                <div className="ml-7 grid grid-cols-2 gap-4">
+                <div className="ml-7 flex flex-col gap-4">
                   <label className={labelCls}>
                     <span className={labelTextCls}>Raum-Typ</span>
                     <input type="text" placeholder="Fotostudio (White Cube), Tageslichtstudio, Hotel, Industriehalle, Loft, Altbauwohnung, Sakralbau, …" className={inputCls} />
@@ -101,13 +102,14 @@ export default function SettingCreatePage() {
                   value="outdoor-urban"
                   checked={locationType === 'outdoor-urban'}
                   onChange={() => setLocationType('outdoor-urban')}
+                  onClick={() => locationType === 'outdoor-urban' && setLocationType(null)}
                   className="w-4 h-4 accent-orange"
                 />
                 <span className="text-navy font-medium">Outdoor Urban / Städtischer Raum</span>
               </label>
 
               {locationType === 'outdoor-urban' && (
-                <div className="ml-7 grid grid-cols-2 gap-4">
+                <div className="ml-7 flex flex-col gap-4">
                   <label className={labelCls}>
                     <span className={labelTextCls}>Umfeld &amp; Szenerie</span>
                     <input type="text" placeholder="Straßenschlucht, Dachterrasse, Skatepark, U-Bahn-Station, Hinterhof, Parkhaus, Moderne Glasfassade, …" className={inputCls} />
@@ -137,13 +139,14 @@ export default function SettingCreatePage() {
                   value="outdoor-natur"
                   checked={locationType === 'outdoor-natur'}
                   onChange={() => setLocationType('outdoor-natur')}
+                  onClick={() => locationType === 'outdoor-natur' && setLocationType(null)}
                   className="w-4 h-4 accent-orange"
                 />
                 <span className="text-navy font-medium">Outdoor Natur / Landschaft</span>
               </label>
 
               {locationType === 'outdoor-natur' && (
-                <div className="ml-7 grid grid-cols-2 gap-4">
+                <div className="ml-7 flex flex-col gap-4">
                   <label className={labelCls}>
                     <span className={labelTextCls}>Landschafts-Typ</span>
                     <input type="text" placeholder="Strand, Küste, Wald, Wüste, Sanddünen, Berge, Felsen, Wiese, Feld, See, Fluss, Vulkanlandschaft, …" className={inputCls} />
@@ -163,101 +166,6 @@ export default function SettingCreatePage() {
                 </div>
               )}
             </div>
-          </div>
-        </section>
-
-        {/* Lichtstimmung & Atmosphäre */}
-        <section className="space-y-4">
-          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Lichtstimmung &amp; Atmosphäre</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <label className={labelCls}>
-              <span className={labelTextCls}>Licht-Charakter</span>
-              <input type="text" placeholder="Weich und diffus, Hart mit Schlagschatten, Cinematic, Blitzlicht-Look, …" className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              <span className={labelTextCls}>Lichtquelle</span>
-              <input type="text" placeholder="Reines Tageslicht, Studio-Kunstlicht, Mischlicht, Neon- & Farbfilter, …" className={inputCls} />
-            </label>
-            <label className={`${labelCls} col-span-2`}>
-              <span className={labelTextCls}>Tageszeit / Stimmung</span>
-              <input type="text" placeholder="High-Key hell und clean, Low-Key dunkel und mystisch, Golden Hour, Sonnenuntergang, Nacht, …" className={inputCls} />
-            </label>
-          </div>
-        </section>
-
-        {/* Farbschema & Tonalität */}
-        <section className="space-y-4">
-          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Farbschema &amp; Tonalität</h3>
-
-          <div className="space-y-2">
-            <span className={labelTextCls}>Dominante Farben des Settings</span>
-            {colors.map((color, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden border border-navy/20 cursor-pointer">
-                  <div className="absolute inset-0" style={{ backgroundColor: color }} />
-                  <input
-                    type="color"
-                    value={color.length === 7 ? color : '#1b2a4a'}
-                    onChange={(e) => updateColor(i, e.target.value)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => updateColorHex(i, e.target.value)}
-                  maxLength={7}
-                  placeholder="#000000"
-                  className="border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange w-32 font-mono text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeColor(i)}
-                  className="text-navy/40 hover:text-navy transition-colors text-lg leading-none"
-                  aria-label="Farbe entfernen"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {colors.length < 5 && (
-              <button
-                type="button"
-                onClick={addColor}
-                className="text-sm text-orange hover:text-orange/80 transition-colors font-medium"
-              >
-                + Weitere Farbe
-              </button>
-            )}
-          </div>
-
-          <label className={labelCls}>
-            <span className={labelTextCls}>Farbsättigung</span>
-            <input type="text" placeholder="Entsättigt, pastellig, Vibrant, knallig, kontrastreich, Schwarz-Weiß, …" className={inputCls} />
-          </label>
-        </section>
-
-        {/* Set-Design & Requisiten */}
-        <section className="space-y-4">
-          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Set-Design &amp; Requisiten</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <label className={`${labelCls} col-span-2 sm:col-span-1`}>
-              <span className={labelTextCls}>Dichte des Sets</span>
-              <select className="border border-navy/20 rounded-md px-3 py-2 text-navy focus:outline-none focus:border-orange">
-                <option value="">Keine Angabe</option>
-                <option value="minimalistisch">Minimalistisch (Fokus nur auf Model)</option>
-                <option value="medium">Medium</option>
-                <option value="maximalistisch">Maximalistisch (opulent / voll)</option>
-              </select>
-            </label>
-            <label className={labelCls}>
-              <span className={labelTextCls}>Möbel und Objekte</span>
-              <input type="text" placeholder="Mid-Century Sessel, Metall-Stühle, Fahrzeuge, Lampen, …" className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              <span className={labelTextCls}>Kleindekoration &amp; organische Elemente</span>
-              <input type="text" placeholder="Blumen, Spiegel, Schnee, Wasserflächen, Kerzen, …" className={inputCls} />
-            </label>
           </div>
         </section>
 
@@ -293,6 +201,103 @@ export default function SettingCreatePage() {
               />
             </label>
           </div>
+        </section>
+
+        {/* Set-Design & Requisiten */}
+        <section className="space-y-4">
+          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Set-Design &amp; Requisiten</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <label className={`${labelCls} col-span-2 sm:col-span-1`}>
+              <span className={labelTextCls}>Dichte des Sets</span>
+              <select className="border border-navy/20 rounded-md px-3 py-2 text-navy focus:outline-none focus:border-orange">
+                <option value="">Keine Angabe</option>
+                <option value="minimalistisch">Minimalistisch (Fokus nur auf Model)</option>
+                <option value="medium">Medium</option>
+                <option value="maximalistisch">Maximalistisch (opulent / voll)</option>
+              </select>
+            </label>
+            <label className={`${labelCls} col-span-2`}>
+              <span className={labelTextCls}>Möbel und Objekte</span>
+              <input type="text" placeholder="Mid-Century Sessel, Metall-Stühle, Fahrzeuge, Lampen, …" className={inputCls} />
+            </label>
+            <label className={`${labelCls} col-span-2`}>
+              <span className={labelTextCls}>Kleindekoration &amp; organische Elemente</span>
+              <input type="text" placeholder="Blumen, Spiegel, Schnee, Wasserflächen, Kerzen, …" className={inputCls} />
+            </label>
+          </div>
+        </section>
+
+        {/* Lichtstimmung & Atmosphäre */}
+        <section className="space-y-4">
+          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Lichtstimmung &amp; Atmosphäre</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <label className={`${labelCls} col-span-2`}>
+              <span className={labelTextCls}>Licht-Charakter</span>
+              <input type="text" placeholder="Weich und diffus, Hart mit Schlagschatten, Cinematic, Blitzlicht-Look, …" className={inputCls} />
+            </label>
+            <label className={`${labelCls} col-span-2`}>
+              <span className={labelTextCls}>Lichtquelle</span>
+              <input type="text" placeholder="Reines Tageslicht, Studio-Kunstlicht, Mischlicht, Neon- & Farbfilter, …" className={inputCls} />
+            </label>
+            <label className={`${labelCls} col-span-2`}>
+              <span className={labelTextCls}>Tageszeit / Stimmung</span>
+              <input type="text" placeholder="High-Key hell und clean, Low-Key dunkel und mystisch, Golden Hour, Sonnenuntergang, Nacht, …" className={inputCls} />
+            </label>
+          </div>
+        </section>
+
+        {/* Farbschema & Tonalität */}
+        <section className="space-y-4">
+          <h3 className="text-base font-bold text-navy uppercase tracking-wide">Farbschema &amp; Tonalität</h3>
+
+          <div className="space-y-3">
+            <span className={labelTextCls}>Dominante Farben des Settings</span>
+            <div className="flex flex-col gap-3">
+              {colors.map((color, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="relative w-10 h-10 shrink-0 rounded overflow-hidden border border-navy/20 cursor-pointer">
+                    <div className="absolute inset-0" style={{ backgroundColor: color }} />
+                    <input
+                      type="color"
+                      value={color.length === 7 ? color : '#1b2a4a'}
+                      onChange={(e) => updateColor(i, e.target.value)}
+                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => updateColorHex(i, e.target.value)}
+                    maxLength={7}
+                    placeholder="#000000"
+                    className="border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange w-32 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeColor(i)}
+                    className="text-navy/40 hover:text-navy transition-colors text-lg leading-none"
+                    aria-label="Farbe entfernen"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {colors.length < 5 && (
+              <button
+                type="button"
+                onClick={addColor}
+                className="block text-sm text-orange hover:text-orange/80 transition-colors font-medium"
+              >
+                + Farbe hinzufügen
+              </button>
+            )}
+          </div>
+
+          <label className={labelCls}>
+            <span className={labelTextCls}>Farbsättigung</span>
+            <input type="text" placeholder="Entsättigt, pastellig, Vibrant, knallig, kontrastreich, Schwarz-Weiß, …" className={inputCls} />
+          </label>
         </section>
 
         {/* Referenzen & Moods */}
