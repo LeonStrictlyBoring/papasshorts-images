@@ -1,10 +1,9 @@
 export default function Header() {
   return (
-    <header className="h-14 bg-navy flex items-center justify-between px-6 flex-none">
-      <img src="/Logo-papasshorts.png" alt="Papas Shorts" className="h-10 w-auto" />
-      <div className="flex items-center gap-4 text-white text-sm">
-        <span className="opacity-70">[Angemeldeter User]</span>
-        <button className="opacity-70 hover:opacity-100 transition-opacity cursor-pointer">
+    <header className="h-14 bg-light-gray flex items-center justify-end px-6 flex-none">
+      <div className="flex items-center gap-4 text-navy text-sm">
+        <span className="opacity-60">[Angemeldeter User]</span>
+        <button className="opacity-60 hover:opacity-100 transition-opacity cursor-pointer font-medium">
           Logout
         </button>
       </div>

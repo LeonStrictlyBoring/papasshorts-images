@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "bildgenerierung-495412",
+    "dev": "bildgenerierung-495412"
+  },
+  "targets": {},
+  "etags": {}
+}

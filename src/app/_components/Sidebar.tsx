@@ -22,7 +22,7 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 bg-navy flex-none flex flex-col overflow-y-auto">
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 pt-16 pb-4">
         <ul>
           {navItems.map((item) => (
             <li key={item.href}>

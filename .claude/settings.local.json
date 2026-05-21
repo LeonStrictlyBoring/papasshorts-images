@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude_ai_Atlassian__getAccessibleAtlassianResources",
+      "mcp__claude_ai_Atlassian__getJiraIssue",
+      "mcp__claude_ai_Atlassian__getTransitionsForJiraIssue",
+      "mcp__claude_ai_Atlassian__getConfluencePage",
+      "mcp__claude_ai_Atlassian__transitionJiraIssue",
+      "Bash(npx next *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "mcp__claude_ai_Atlassian__addCommentToJiraIssue",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Directory\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "PowerShell(tree \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\\\\src\" -L 3)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\\\\src\" -Recurse -Directory | Select-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\\\\src\"\\), \"src\" })",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next:', p.dependencies.next || p.devDependencies?.next\\)\")",
+      "Bash(git push *)",
+      "Bash(find D:\\\\\\\\01_Prodct Group\\\\\\\\01_Prodct Dev\\\\\\\\Papasshorts\\\\\\\\papasshorts-images *)",
+      "Bash(ls *)",
+      "Bash(find \"D:\\\\\\\\01_Prodct Group\\\\\\\\01_Prodct Dev\\\\\\\\Papasshorts\\\\\\\\papasshorts-images/src\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\))",
+      "Bash(xargs grep -l \"Model\")"
+    ]
+  }
+}
