@@ -3,7 +3,11 @@ import { GoogleGenAI } from '@google/genai';
 import { getStorage } from 'firebase-admin/storage';
 import * as crypto from 'crypto';
 
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({
+  vertexai: true,
+  project: 'bildgenerierung-495412',
+  location: 'europe-west3',
+});
 
 export const generateImage = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
@@ -19,7 +23,7 @@ export const generateImage = onCall({
   }
 
   const response = await ai.models.generateImages({
-    model: 'imagen-3.0-generate-002',
+    model: 'imagen-3.0-generate-001',
     prompt: prompt,
     config: {
       numberOfImages: 1,
@@ -28,8 +32,10 @@ export const generateImage = onCall({
     },
   });
 
-  const imageBytes = response.generatedImages![0].image!.imageBytes!;
-  const buffer = Buffer.from(imageBytes as string, 'base64');
+  const rawBytes = response.generatedImages![0].image!.imageBytes!;
+  const buffer = typeof rawBytes === 'string'
+    ? Buffer.from(rawBytes, 'base64')
+    : Buffer.from(rawBytes as Uint8Array);
 
   const filename = `generated/${crypto.randomUUID()}.jpg`;
   const bucket = getStorage().bucket();

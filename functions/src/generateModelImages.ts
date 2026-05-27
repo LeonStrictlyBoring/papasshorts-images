@@ -35,7 +35,11 @@ interface GenerateModelImagesRequest {
   customArchetype?: string;
 }
 
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({
+  vertexai: true,
+  project: 'bildgenerierung-495412',
+  location: 'europe-west3',
+});
 const NUMBER_OF_IMAGES = 4;
 
 function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): string {
@@ -111,7 +115,7 @@ export const generateModelImages = onCall({
   let response;
   try {
     response = await ai.models.generateImages({
-      model: 'imagen-3.0-generate-002',
+      model: 'imagen-3.0-generate-001',
       prompt: finalPrompt,
       config: {
         numberOfImages: NUMBER_OF_IMAGES,
@@ -132,8 +136,10 @@ export const generateModelImages = onCall({
   const images: { url: string; storagePath: string }[] = [];
 
   for (let i = 0; i < (response.generatedImages?.length ?? 0); i++) {
-    const imageBytes = response.generatedImages![i].image!.imageBytes!;
-    const buffer = Buffer.from(imageBytes as string, 'base64');
+    const rawBytes = response.generatedImages![i].image!.imageBytes!;
+    const buffer = typeof rawBytes === 'string'
+      ? Buffer.from(rawBytes, 'base64')
+      : Buffer.from(rawBytes as Uint8Array);
     const storagePath = `generated/models/${userId}/${timestamp}/${i}.jpg`;
     const file = bucket.file(storagePath);
 
