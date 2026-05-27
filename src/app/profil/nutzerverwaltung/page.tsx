@@ -148,13 +148,13 @@ export default function NutzerverwaltungPage() {
                           {u.status === 'pending' && (
                             <ActionBtn onClick={() => updateStatus(u, 'active')} label="Freischalten" color="green" />
                           )}
-                          {u.status === 'active' && u.uid !== currentUser?.uid && (
+                          {u.status === 'active' && u.uid !== currentUser?.uid && (u.role !== 'admin' || countActiveAdmins(u.uid) >= 1) && (
                             <ActionBtn onClick={() => updateStatus(u, 'inactive')} label="Deaktivieren" color="yellow" />
                           )}
                           {u.status === 'inactive' && (
                             <ActionBtn onClick={() => updateStatus(u, 'active')} label="Reaktivieren" color="green" />
                           )}
-                          {u.uid !== currentUser?.uid && (
+                          {u.uid !== currentUser?.uid && (u.role !== 'admin' || countActiveAdmins(u.uid) >= 1) && (
                             <ActionBtn onClick={() => setConfirmDelete(u)} label="Löschen" color="red" />
                           )}
                         </>
