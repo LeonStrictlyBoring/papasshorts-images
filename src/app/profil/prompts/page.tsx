@@ -12,8 +12,36 @@ interface PromptData {
   updatedBy: string
 }
 
-const PROMPTS: { id: PromptId; label: string }[] = [
-  { id: 'model-creation', label: 'Model erstellen' },
+interface Placeholder {
+  key: string
+  description: string
+}
+
+const PROMPTS: { id: PromptId; label: string; placeholders?: Placeholder[] }[] = [
+  {
+    id: 'model-creation',
+    label: 'Model erstellen',
+    placeholders: [
+      { key: '{{persona}}',            description: 'Freitext-Beschreibung der Persona' },
+      { key: '{{körpergröße}}',        description: 'Körpergröße in cm' },
+      { key: '{{konfektionsgröße}}',   description: 'Konfektionsgröße (S / M / L / XL)' },
+      { key: '{{schuhgröße}}',         description: 'Schuhgröße' },
+      { key: '{{brustumfang}}',        description: 'Brustumfang in cm' },
+      { key: '{{taillenumfang}}',      description: 'Taillenumfang in cm' },
+      { key: '{{hüftumfang}}',         description: 'Hüftumfang in cm' },
+      { key: '{{statur}}',             description: 'Statur / Körpertyp (z.B. Schlank, Sportlich)' },
+      { key: '{{phänotyp}}',           description: 'Phänotyp (z.B. Kaukasisch, Mediterran)' },
+      { key: '{{augenfarbe}}',         description: 'Augenfarbe' },
+      { key: '{{hautton}}',            description: 'Hautton (z.B. Hell, Medium, Dunkel)' },
+      { key: '{{haut_unterton}}',      description: 'Haut-Unterton (z.B. Warm, Kühl, Neutral)' },
+      { key: '{{haarfarbe}}',          description: 'Haarfarbe' },
+      { key: '{{haarstruktur}}',       description: 'Haarstruktur (z.B. Glatt, Lockig)' },
+      { key: '{{haarlänge}}',          description: 'Haarlänge (z.B. Kurz, Lang)' },
+      { key: '{{bart}}',               description: 'Bart (z.B. Glatt rasiert, Vollbart)' },
+      { key: '{{besondere_merkmale}}', description: 'Besondere Merkmale (Freitext)' },
+      { key: '{{archetypen}}',         description: 'Gewählte Archetypen, kommagetrennt' },
+    ],
+  },
   { id: 'setting-creation', label: 'Setting erstellen' },
   { id: 'shooting-creation', label: 'Shooting erstellen' },
 ]
@@ -28,7 +56,7 @@ function formatDate(ts: Timestamp | null): string {
   })
 }
 
-function PromptSection({ id, label }: { id: PromptId; label: string }) {
+function PromptSection({ id, label, placeholders }: { id: PromptId; label: string; placeholders?: Placeholder[] }) {
   const [data, setData] = useState<PromptData | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -81,10 +109,28 @@ function PromptSection({ id, label }: { id: PromptId; label: string }) {
         )}
       </div>
 
+      {placeholders && placeholders.length > 0 && (
+        <div className="space-y-2 pb-2 border-b border-navy/10">
+          <p className="text-xs text-navy/50">
+            Dieser Prompt wird mit den Sedcard-Daten des Models bestückt. Verfügbare Platzhalter:
+          </p>
+          <ul className="space-y-1">
+            {placeholders.map((p) => (
+              <li key={p.key} className="flex items-baseline gap-2 text-sm">
+                <code className="bg-navy/5 text-navy font-mono text-xs px-1.5 py-0.5 rounded shrink-0">
+                  {p.key}
+                </code>
+                <span className="text-navy/50">— {p.description}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {editing ? (
         <div className="space-y-3">
           <textarea
-            rows={10}
+            rows={12}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             className={inputCls}
@@ -113,7 +159,7 @@ function PromptSection({ id, label }: { id: PromptId; label: string }) {
           {data === null ? (
             <p className="text-navy/40 text-sm">Wird geladen …</p>
           ) : data.systemPrompt ? (
-            <p className="text-navy text-sm whitespace-pre-wrap">{data.systemPrompt}</p>
+            <p className="text-navy text-sm whitespace-pre-wrap font-mono">{data.systemPrompt}</p>
           ) : (
             <p className="text-navy/40 text-sm italic">Noch kein Prompt hinterlegt.</p>
           )}
@@ -133,7 +179,7 @@ export default function PromptsPage() {
     <div className="max-w-3xl space-y-8">
       <h1 className="text-3xl font-bold text-navy">Prompt-Verwaltung</h1>
       {PROMPTS.map((p) => (
-        <PromptSection key={p.id} id={p.id} label={p.label} />
+        <PromptSection key={p.id} id={p.id} label={p.label} placeholders={p.placeholders} />
       ))}
     </div>
   )
