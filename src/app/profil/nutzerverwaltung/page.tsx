@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function NutzerverwaltungPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, isDeveloper } = useAuth()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -67,6 +67,10 @@ export default function NutzerverwaltungPage() {
   async function updateRole(u: UserRow, newRole: 'user' | 'admin' | 'developer') {
     if (u.uid === currentUser?.uid && newRole === 'user') {
       setError('Eigene Rolle kann nicht auf Nutzer herabgesetzt werden.')
+      return
+    }
+    if (newRole === 'developer' && !isDeveloper) {
+      setError('Nur Developer dürfen die Developer-Rolle vergeben.')
       return
     }
     if ((u.role === 'admin' || u.role === 'developer') && newRole === 'user') {
@@ -124,12 +128,13 @@ export default function NutzerverwaltungPage() {
                   <td className="py-3 pr-4">
                     <select
                       value={u.role}
+                      disabled={u.uid === currentUser?.uid}
                       onChange={(e) => updateRole(u, e.target.value as UserRow['role'])}
-                      className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange"
+                      className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <option value="user">Nutzer</option>
                       <option value="admin">Admin</option>
-                      <option value="developer">Developer</option>
+                      {isDeveloper && <option value="developer">Developer</option>}
                     </select>
                   </td>
                   <td className="py-3 pr-4">
