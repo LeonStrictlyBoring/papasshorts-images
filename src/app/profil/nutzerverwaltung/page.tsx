@@ -126,8 +126,8 @@ export default function NutzerverwaltungPage() {
                   <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
                   <td className="py-3 pr-4 text-navy/70">{u.email}</td>
                   <td className="py-3 pr-4">
-                    {u.uid === currentUser?.uid || (!isDeveloper && u.role === 'developer') ? (
-                      <span className="text-sm text-navy/60">{ROLE_LABELS[u.role]}</span>
+                    {!isDeveloper && u.role === 'developer' ? (
+                      <span className="text-sm text-navy/60">Developer</span>
                     ) : (
                       <select
                         value={u.role}
