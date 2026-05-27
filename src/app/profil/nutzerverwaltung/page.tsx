@@ -14,24 +14,27 @@ interface UserRow {
   status: 'pending' | 'active' | 'inactive'
 }
 
-const ROLE_LABELS: Record<string, string> = { user: 'Nutzer', admin: 'Admin', developer: 'Developer' }
-const STATUS_LABELS: Record<string, string> = { pending: 'Ausstehend', active: 'Aktiv', inactive: 'Inaktiv' }
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  active: 'bg-green-100 text-green-800',
-  inactive: 'bg-red-100 text-red-800',
+function countActiveAdmins(list: UserRow[], excluding?: string) {
+  return list.filter(
+    (u) => u.role === 'admin' && u.status === 'active' && u.uid !== excluding
+  ).length
 }
 
 export default function NutzerverwaltungPage() {
   const { user: currentUser, isDeveloper } = useAuth()
   const [users, setUsers] = useState<UserRow[]>([])
+  const [draft, setDraft] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null)
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
+  const hasChanges = draft.some((d) => {
+    const original = users.find((u) => u.uid === d.uid)
+    return original && (original.role !== d.role || original.status !== d.status)
+  })
+
+  useEffect(() => { loadUsers() }, [])
 
   async function loadUsers() {
     setLoading(true)
@@ -40,6 +43,7 @@ export default function NutzerverwaltungPage() {
       const rows: UserRow[] = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<UserRow, 'uid'>) }))
       rows.sort((a, b) => a.name.localeCompare(b.name))
       setUsers(rows)
+      setDraft(rows.map((r) => ({ ...r })))
     } catch {
       setError('Nutzer konnten nicht geladen werden.')
     } finally {
@@ -47,36 +51,44 @@ export default function NutzerverwaltungPage() {
     }
   }
 
-  function countActiveAdmins(excluding?: string) {
-    return users.filter(
-      (u) => u.role === 'admin' && u.status === 'active' && u.uid !== excluding
-    ).length
+  function updateDraftStatus(uid: string, active: boolean) {
+    setDraft((prev) => prev.map((u) => u.uid === uid ? { ...u, status: active ? 'active' : 'inactive' } : u))
   }
 
-  async function updateStatus(u: UserRow, newStatus: 'active' | 'inactive') {
-    if (u.role === 'admin' && newStatus === 'inactive') {
-      if (countActiveAdmins(u.uid) < 1) {
-        setError('Es muss immer mindestens ein Admin vorhanden sein.')
-        return
-      }
-    }
-    await updateDoc(doc(db, 'users', u.uid), { status: newStatus })
-    setUsers((prev) => prev.map((r) => (r.uid === u.uid ? { ...r, status: newStatus } : r)))
-  }
-
-  async function updateRole(u: UserRow, newRole: 'user' | 'admin' | 'developer') {
-    if (newRole === 'developer' && !isDeveloper) {
+  function updateDraftRole(uid: string, role: UserRow['role']) {
+    if (role === 'developer' && !isDeveloper) {
       setError('Nur Developer dürfen die Developer-Rolle vergeben.')
       return
     }
-    if (u.role === 'admin' && newRole !== 'admin') {
-      if (countActiveAdmins(u.uid) < 1) {
-        setError('Es muss immer mindestens ein Admin vorhanden sein.')
-        return
-      }
+    setDraft((prev) => prev.map((u) => u.uid === uid ? { ...u, role } : u))
+  }
+
+  function cancel() {
+    setDraft(users.map((r) => ({ ...r })))
+    setError('')
+  }
+
+  async function applyChanges() {
+    if (countActiveAdmins(draft) < 1) {
+      setError('Es muss immer mindestens ein aktiver Admin vorhanden sein.')
+      return
     }
-    await updateDoc(doc(db, 'users', u.uid), { role: newRole })
-    setUsers((prev) => prev.map((r) => (r.uid === u.uid ? { ...r, role: newRole } : r)))
+    setSaving(true)
+    try {
+      const changed = draft.filter((d) => {
+        const original = users.find((u) => u.uid === d.uid)
+        return original && (original.role !== d.role || original.status !== d.status)
+      })
+      await Promise.all(
+        changed.map((d) => updateDoc(doc(db, 'users', d.uid), { role: d.role, status: d.status }))
+      )
+      setUsers(draft.map((r) => ({ ...r })))
+      setError('')
+    } catch {
+      setError('Änderungen konnten nicht gespeichert werden.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(u: UserRow) {
@@ -85,6 +97,7 @@ export default function NutzerverwaltungPage() {
       const fn = httpsCallable<{ uid: string }, { success: boolean }>(functions, 'deleteUser')
       await fn({ uid: u.uid })
       setUsers((prev) => prev.filter((r) => r.uid !== u.uid))
+      setDraft((prev) => prev.filter((r) => r.uid !== u.uid))
     } catch (err) {
       const msg = (err as { message?: string }).message ?? 'Löschen fehlgeschlagen.'
       setError(msg)
@@ -105,68 +118,93 @@ export default function NutzerverwaltungPage() {
       {loading ? (
         <p className="text-navy/50 text-sm">Lade Nutzer …</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b border-navy/10 text-left text-navy/50 text-xs uppercase tracking-wide">
-                <th className="pb-2 pr-4 font-medium">Name</th>
-                <th className="pb-2 pr-4 font-medium">E-Mail</th>
-                <th className="pb-2 pr-4 font-medium">Rolle</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
-                <th className="pb-2 font-medium">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy/5">
-              {users.map((u) => (
-                <tr key={u.uid} className="hover:bg-navy/5">
-                  <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
-                  <td className="py-3 pr-4 text-navy/70">{u.email}</td>
-                  <td className="py-3 pr-4">
-                    {!isDeveloper && u.role === 'developer' ? (
-                      <span className="text-sm text-navy/60">Developer</span>
-                    ) : (
-                      <select
-                        value={u.role}
-                        onChange={(e) => updateRole(u, e.target.value as UserRow['role'])}
-                        className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange"
-                      >
-                        <option value="user">Nutzer</option>
-                        <option value="admin">Admin</option>
-                        {isDeveloper && <option value="developer">Developer</option>}
-                      </select>
-                    )}
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[u.status]}`}>
-                      {STATUS_LABELS[u.status]}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <div className="flex items-center gap-2">
-                      {(isDeveloper || u.role !== 'developer') && (
-                        <>
-                          {u.status === 'pending' && (
-                            <ActionBtn onClick={() => updateStatus(u, 'active')} label="Freischalten" color="green" />
-                          )}
-                          {u.status === 'active' && u.uid !== currentUser?.uid && (u.role !== 'admin' || countActiveAdmins(u.uid) >= 1) && (
-                            <ActionBtn onClick={() => updateStatus(u, 'inactive')} label="Deaktivieren" color="yellow" />
-                          )}
-                          {u.status === 'inactive' && (
-                            <ActionBtn onClick={() => updateStatus(u, 'active')} label="Reaktivieren" color="green" />
-                          )}
-                          {u.uid !== currentUser?.uid && (u.role !== 'admin' || countActiveAdmins(u.uid) >= 1) && (
-                            <ActionBtn onClick={() => setConfirmDelete(u)} label="Löschen" color="red" />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-navy/10 text-left text-navy/50 text-xs uppercase tracking-wide">
+                  <th className="pb-2 pr-4 font-medium">Name</th>
+                  <th className="pb-2 pr-4 font-medium">E-Mail</th>
+                  <th className="pb-2 pr-4 font-medium">Aktivieren</th>
+                  <th className="pb-2 pr-4 font-medium">Rolle</th>
+                  <th className="pb-2 font-medium">Aktionen</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {users.length === 0 && <p className="text-center text-navy/40 text-sm py-8">Keine Nutzer gefunden.</p>}
-        </div>
+              </thead>
+              <tbody className="divide-y divide-navy/5">
+                {draft.map((u) => {
+                  const isDevRow = !isDeveloper && u.role === 'developer'
+                  const isLastAdmin = u.role === 'admin' && countActiveAdmins(users, u.uid) < 1
+                  return (
+                    <tr key={u.uid} className="hover:bg-navy/5">
+                      <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
+                      <td className="py-3 pr-4 text-navy/70">{u.email}</td>
+                      <td className="py-3 pr-4">
+                        {!isDevRow && (
+                          <label className="flex items-center gap-2 cursor-pointer w-fit">
+                            <input
+                              type="checkbox"
+                              checked={u.status === 'active'}
+                              onChange={(e) => updateDraftStatus(u.uid, e.target.checked)}
+                              className="w-4 h-4 accent-orange"
+                            />
+                            <span className="text-navy/70">Aktivieren</span>
+                          </label>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {isDevRow ? (
+                          <span className="text-navy/60">Developer</span>
+                        ) : (
+                          <select
+                            value={u.role}
+                            onChange={(e) => updateDraftRole(u.uid, e.target.value as UserRow['role'])}
+                            className="border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange"
+                          >
+                            <option value="user">Nutzer</option>
+                            <option value="admin">Admin</option>
+                            {isDeveloper && <option value="developer">Developer</option>}
+                          </select>
+                        )}
+                      </td>
+                      <td className="py-3">
+                        {!isDevRow && u.uid !== currentUser?.uid && !isLastAdmin && (
+                          <button
+                            onClick={() => setConfirmDelete(u)}
+                            className="text-xs font-medium px-2 py-1 rounded text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            Löschen
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {draft.length === 0 && (
+              <p className="text-center text-navy/40 text-sm py-8">Keine Nutzer gefunden.</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 pt-2 border-t border-navy/10">
+            <button
+              onClick={applyChanges}
+              disabled={!hasChanges || saving}
+              className="bg-orange text-white font-semibold px-5 py-2 rounded-md hover:bg-orange/90 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Speichern …' : 'Änderungen übernehmen'}
+            </button>
+            {hasChanges && (
+              <button
+                onClick={cancel}
+                disabled={saving}
+                className="text-sm text-navy/60 hover:text-navy px-3 py-2 transition-colors"
+              >
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </>
       )}
 
       {confirmDelete && (
@@ -180,57 +218,25 @@ export default function NutzerverwaltungPage() {
   )
 }
 
-function ActionBtn({ onClick, label, color }: { onClick: () => void; label: string; color: 'green' | 'yellow' | 'red' }) {
-  const cls = {
-    green: 'text-green-700 hover:bg-green-50',
-    yellow: 'text-yellow-700 hover:bg-yellow-50',
-    red: 'text-red-600 hover:bg-red-50',
-  }[color]
-  return (
-    <button onClick={onClick} className={`text-xs font-medium px-2 py-1 rounded transition-colors ${cls}`}>
-      {label}
-    </button>
-  )
-}
-
 function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <Modal title="Bestätigung" onClose={onCancel}>
-      <div className="space-y-4">
-        <p className="text-sm text-navy/80">{message}</p>
-        <div className="flex justify-end gap-3">
-          <button onClick={onCancel} className="text-sm text-navy/60 hover:text-navy px-3 py-2">Abbrechen</button>
-          <button onClick={onConfirm}
-            className="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-700 transition-colors">
-            Löschen
-          </button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-navy">{title}</h2>
-          <button onClick={onClose} className="text-navy/40 hover:text-navy text-xl leading-none">×</button>
+          <h2 className="text-lg font-bold text-navy">Bestätigung</h2>
+          <button onClick={onCancel} className="text-navy/40 hover:text-navy text-xl leading-none">×</button>
         </div>
-        {children}
+        <p className="text-sm text-navy/80">{message}</p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onCancel} className="text-sm text-navy/60 hover:text-navy px-3 py-2">Abbrechen</button>
+          <button
+            onClick={onConfirm}
+            className="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
+          >
+            Löschen
+          </button>
+        </div>
       </div>
     </div>
   )
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-navy mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-const inputCls = 'border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange w-full text-sm'
