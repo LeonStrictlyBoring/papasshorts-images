@@ -5,7 +5,9 @@ import * as crypto from 'crypto';
 
 const ai = new GoogleGenAI({});
 
-export const generateImage = onCall(async (request) => {
+export const generateImage = onCall({
+  serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
+}, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
