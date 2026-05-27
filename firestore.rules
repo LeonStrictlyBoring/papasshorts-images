@@ -3,17 +3,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 6, 20);
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdminOrDeveloper() {
+      return isSignedIn() && userDocExists() && userRole() in ['admin', 'developer'];
+    }
+
+    function isDeveloper() {
+      return isSignedIn() && userDocExists() && userRole() == 'developer';
+    }
+
+    // users collection
+    match /users/{uid} {
+      // own profile: read only
+      allow read: if isSignedIn() && request.auth.uid == uid;
+
+      // admin/developer: read and write all profiles
+      allow read, write: if isAdminOrDeveloper();
+
+      // self-registration: create own document with role:user and status:pending
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.status == 'pending';
+    }
+
+    // prompts collection: developer read/write only
+    match /prompts/{promptId} {
+      allow read, write: if isDeveloper();
     }
   }
 }
