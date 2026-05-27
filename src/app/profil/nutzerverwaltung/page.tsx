@@ -27,8 +27,6 @@ export default function NutzerverwaltungPage() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [resetLink, setResetLink] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<UserRow | null>(null)
 
   useEffect(() => {
@@ -95,15 +93,7 @@ export default function NutzerverwaltungPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-navy">Nutzerverwaltung</h1>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="bg-orange text-white font-semibold px-4 py-2 rounded-md hover:bg-orange/90 transition-colors text-sm"
-        >
-          + Nutzer anlegen
-        </button>
-      </div>
+      <h1 className="text-2xl font-bold text-navy">Nutzerverwaltung</h1>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-md flex justify-between">
@@ -171,22 +161,6 @@ export default function NutzerverwaltungPage() {
         </div>
       )}
 
-      {showCreateForm && (
-        <CreateUserModal
-          onClose={() => setShowCreateForm(false)}
-          onCreated={(link, newUser) => {
-            setUsers((prev) => [...prev, newUser].sort((a, b) => a.name.localeCompare(b.name)))
-            setShowCreateForm(false)
-            setResetLink(link)
-          }}
-          onError={setError}
-        />
-      )}
-
-      {resetLink && (
-        <ResetLinkModal link={resetLink} onClose={() => setResetLink('')} />
-      )}
-
       {confirmDelete && (
         <ConfirmModal
           message={`Nutzer „${confirmDelete.name}" wirklich löschen?`}
@@ -208,104 +182,6 @@ function ActionBtn({ onClick, label, color }: { onClick: () => void; label: stri
     <button onClick={onClick} className={`text-xs font-medium px-2 py-1 rounded transition-colors ${cls}`}>
       {label}
     </button>
-  )
-}
-
-function CreateUserModal({
-  onClose,
-  onCreated,
-  onError,
-}: {
-  onClose: () => void
-  onCreated: (link: string, user: UserRow) => void
-  onError: (msg: string) => void
-}) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<'user' | 'admin' | 'developer'>('user')
-  const [loading, setLoading] = useState(false)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      const fn = httpsCallable<
-        { name: string; email: string; role: string },
-        { uid: string; resetLink: string }
-      >(functions, 'createUser')
-      const result = await fn({ name, email, role })
-      onCreated(result.data.resetLink, { uid: result.data.uid, name, email, role, status: 'active' })
-    } catch (err) {
-      const msg = (err as { message?: string }).message ?? 'Nutzer anlegen fehlgeschlagen.'
-      onError(msg)
-      onClose()
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <Modal title="Nutzer anlegen" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Name">
-          <input type="text" required value={name} onChange={(e) => setName(e.target.value)}
-            className={inputCls} placeholder="Max Mustermann" />
-        </Field>
-        <Field label="E-Mail">
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-            className={inputCls} placeholder="name@beispiel.de" />
-        </Field>
-        <Field label="Rolle">
-          <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} className={inputCls}>
-            <option value="user">Nutzer</option>
-            <option value="admin">Admin</option>
-            <option value="developer">Developer</option>
-          </select>
-        </Field>
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className="text-sm text-navy/60 hover:text-navy px-3 py-2">
-            Abbrechen
-          </button>
-          <button type="submit" disabled={loading}
-            className="bg-orange text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-orange/90 disabled:opacity-50 transition-colors">
-            {loading ? 'Anlegen …' : 'Anlegen'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-function ResetLinkModal({ link, onClose }: { link: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false)
-
-  function copy() {
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <Modal title="Nutzer angelegt" onClose={onClose}>
-      <div className="space-y-4">
-        <p className="text-sm text-navy/70">
-          Der Nutzer wurde angelegt. Teile diesen Link, damit er sein Passwort setzen kann:
-        </p>
-        <div className="bg-navy/5 rounded-md p-3 text-xs break-all text-navy/80 font-mono">
-          {link}
-        </div>
-        <div className="flex justify-end gap-3">
-          <button onClick={copy}
-            className="text-sm font-medium px-4 py-2 border border-navy/20 rounded-md hover:bg-navy/5 transition-colors text-navy">
-            {copied ? 'Kopiert!' : 'Link kopieren'}
-          </button>
-          <button onClick={onClose}
-            className="bg-orange text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-orange/90 transition-colors">
-            Fertig
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }
 
