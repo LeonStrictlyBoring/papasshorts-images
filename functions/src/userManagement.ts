@@ -60,15 +60,15 @@ export const deleteUser = onCall({ region: 'europe-west3' }, async (request) => 
   if (!targetSnap.exists) throw new HttpsError('not-found', 'Nutzer nicht gefunden.');
 
   const targetRole = targetSnap.data()?.role;
-  if (targetRole === 'admin' || targetRole === 'developer') {
+  if (targetRole === 'admin') {
     const adminsSnap = await db.collection('users')
-      .where('role', 'in', ['admin', 'developer'])
+      .where('role', '==', 'admin')
       .where('status', '==', 'active')
       .get();
     if (adminsSnap.size <= 1) {
       throw new HttpsError(
         'failed-precondition',
-        'Letzter aktiver Admin/Developer kann nicht gelöscht werden.'
+        'Es muss immer mindestens ein Admin vorhanden sein.'
       );
     }
   }

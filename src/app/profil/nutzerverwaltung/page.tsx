@@ -49,14 +49,14 @@ export default function NutzerverwaltungPage() {
 
   function countActiveAdmins(excluding?: string) {
     return users.filter(
-      (u) => (u.role === 'admin' || u.role === 'developer') && u.status === 'active' && u.uid !== excluding
+      (u) => u.role === 'admin' && u.status === 'active' && u.uid !== excluding
     ).length
   }
 
   async function updateStatus(u: UserRow, newStatus: 'active' | 'inactive') {
-    if ((u.role === 'admin' || u.role === 'developer') && newStatus === 'inactive') {
-      if (countActiveAdmins() <= 1) {
-        setError('Letzter aktiver Admin/Developer kann nicht deaktiviert werden.')
+    if (u.role === 'admin' && newStatus === 'inactive') {
+      if (countActiveAdmins(u.uid) < 1) {
+        setError('Es muss immer mindestens ein Admin vorhanden sein.')
         return
       }
     }
@@ -69,9 +69,9 @@ export default function NutzerverwaltungPage() {
       setError('Nur Developer dürfen die Developer-Rolle vergeben.')
       return
     }
-    if ((u.role === 'admin' || u.role === 'developer') && newRole === 'user') {
-      if (countActiveAdmins() <= 1) {
-        setError('Letzter aktiver Admin/Developer kann nicht herabgesetzt werden.')
+    if (u.role === 'admin' && newRole !== 'admin') {
+      if (countActiveAdmins(u.uid) < 1) {
+        setError('Es muss immer mindestens ein Admin vorhanden sein.')
         return
       }
     }
