@@ -126,16 +126,20 @@ export default function NutzerverwaltungPage() {
                   <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
                   <td className="py-3 pr-4 text-navy/70">{u.email}</td>
                   <td className="py-3 pr-4">
-                    <select
-                      value={u.role}
-                      disabled={u.uid === currentUser?.uid}
-                      onChange={(e) => updateRole(u, e.target.value as UserRow['role'])}
-                      className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <option value="user">Nutzer</option>
-                      <option value="admin">Admin</option>
-                      {isDeveloper && <option value="developer">Developer</option>}
-                    </select>
+                    {!isDeveloper && u.role === 'developer' ? (
+                      <span className="text-sm text-navy/60">Developer</span>
+                    ) : (
+                      <select
+                        value={u.role}
+                        disabled={u.uid === currentUser?.uid}
+                        onChange={(e) => updateRole(u, e.target.value as UserRow['role'])}
+                        className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <option value="user">Nutzer</option>
+                        <option value="admin">Admin</option>
+                        {isDeveloper && <option value="developer">Developer</option>}
+                      </select>
+                    )}
                   </td>
                   <td className="py-3 pr-4">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[u.status]}`}>
@@ -144,17 +148,21 @@ export default function NutzerverwaltungPage() {
                   </td>
                   <td className="py-3">
                     <div className="flex items-center gap-2">
-                      {u.status === 'pending' && (
-                        <ActionBtn onClick={() => updateStatus(u, 'active')} label="Freischalten" color="green" />
-                      )}
-                      {u.status === 'active' && u.uid !== currentUser?.uid && (
-                        <ActionBtn onClick={() => updateStatus(u, 'inactive')} label="Deaktivieren" color="yellow" />
-                      )}
-                      {u.status === 'inactive' && (
-                        <ActionBtn onClick={() => updateStatus(u, 'active')} label="Reaktivieren" color="green" />
-                      )}
-                      {u.uid !== currentUser?.uid && (
-                        <ActionBtn onClick={() => setConfirmDelete(u)} label="Löschen" color="red" />
+                      {(isDeveloper || u.role !== 'developer') && (
+                        <>
+                          {u.status === 'pending' && (
+                            <ActionBtn onClick={() => updateStatus(u, 'active')} label="Freischalten" color="green" />
+                          )}
+                          {u.status === 'active' && u.uid !== currentUser?.uid && (
+                            <ActionBtn onClick={() => updateStatus(u, 'inactive')} label="Deaktivieren" color="yellow" />
+                          )}
+                          {u.status === 'inactive' && (
+                            <ActionBtn onClick={() => updateStatus(u, 'active')} label="Reaktivieren" color="green" />
+                          )}
+                          {u.uid !== currentUser?.uid && (
+                            <ActionBtn onClick={() => setConfirmDelete(u)} label="Löschen" color="red" />
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
