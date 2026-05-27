@@ -1,5 +1,7 @@
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { setGlobalOptions } from 'firebase-functions';
 
+if (!getApps().length) initializeApp();
 setGlobalOptions({ maxInstances: 10, region: 'europe-west3' });
 
 export { generateImage } from './generateImage';
