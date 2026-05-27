@@ -126,14 +126,13 @@ export default function NutzerverwaltungPage() {
                   <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
                   <td className="py-3 pr-4 text-navy/70">{u.email}</td>
                   <td className="py-3 pr-4">
-                    {!isDeveloper && u.role === 'developer' ? (
-                      <span className="text-sm text-navy/60">Developer</span>
+                    {u.uid === currentUser?.uid || (!isDeveloper && u.role === 'developer') ? (
+                      <span className="text-sm text-navy/60">{ROLE_LABELS[u.role]}</span>
                     ) : (
                       <select
                         value={u.role}
-                        disabled={u.uid === currentUser?.uid}
                         onChange={(e) => updateRole(u, e.target.value as UserRow['role'])}
-                        className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-sm border border-navy/20 rounded px-2 py-1 text-navy focus:outline-none focus:border-orange"
                       >
                         <option value="user">Nutzer</option>
                         <option value="admin">Admin</option>
