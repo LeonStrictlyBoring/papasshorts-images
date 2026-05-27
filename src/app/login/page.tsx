@@ -40,6 +40,8 @@ export default function LoginPage() {
       const code = (err as { code?: string }).code
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
         setError('E-Mail oder Passwort falsch.')
+      } else if (code === 'auth/too-many-requests') {
+        setError('Zu viele fehlgeschlagene Versuche. Bitte warte kurz oder setze dein Passwort zurück.')
       } else {
         setError('Anmeldung fehlgeschlagen. Bitte versuche es erneut.')
       }
