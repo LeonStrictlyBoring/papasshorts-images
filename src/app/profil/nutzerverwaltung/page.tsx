@@ -139,7 +139,7 @@ export default function NutzerverwaltungPage() {
                       <td className="py-3 pr-4 text-navy font-medium">{u.name}</td>
                       <td className="py-3 pr-4 text-navy/70">{u.email}</td>
                       <td className="py-3 pr-4">
-                        {!isDevRow && (
+                        {u.role !== 'developer' && (
                           <label className="flex items-center gap-2 cursor-pointer w-fit">
                             <input
                               type="checkbox"
