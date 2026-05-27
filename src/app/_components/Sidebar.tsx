@@ -10,6 +10,7 @@ const navItems = [
   { label: "Settings", href: "/settings" },
   { label: "Shootings", href: "/shootings" },
   { label: "Profil", href: "/profil" },
+  { label: "Prompts", href: "/profil/prompts", indent: true },
 ];
 
 export default function Sidebar() {
@@ -28,10 +29,12 @@ export default function Sidebar() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`flex items-center px-6 py-3 text-sm font-medium transition-colors ${
+                className={`flex items-center py-3 text-sm font-medium transition-colors border-l-4 ${
+                  item.indent ? "px-10" : "px-6"
+                } ${
                   isActive(item.href)
-                    ? "bg-white/10 text-white border-l-4 border-orange"
-                    : "text-white/60 hover:bg-white/5 hover:text-white border-l-4 border-transparent"
+                    ? "bg-white/10 text-white border-orange"
+                    : "text-white/60 hover:bg-white/5 hover:text-white border-transparent"
                 }`}
               >
                 {item.label}
