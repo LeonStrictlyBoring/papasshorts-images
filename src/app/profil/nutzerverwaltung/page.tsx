@@ -65,10 +65,6 @@ export default function NutzerverwaltungPage() {
   }
 
   async function updateRole(u: UserRow, newRole: 'user' | 'admin' | 'developer') {
-    if (u.uid === currentUser?.uid && newRole === 'user') {
-      setError('Eigene Rolle kann nicht auf Nutzer herabgesetzt werden.')
-      return
-    }
     if (newRole === 'developer' && !isDeveloper) {
       setError('Nur Developer dürfen die Developer-Rolle vergeben.')
       return
