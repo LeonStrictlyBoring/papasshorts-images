@@ -35,7 +35,6 @@ interface GenerateModelImagesRequest {
   customArchetype?: string;
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const NUMBER_OF_IMAGES = 4;
 
 function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): string {
@@ -79,6 +78,7 @@ export const generateModelImages = onCall({
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
 
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const data = request.data as GenerateModelImagesRequest;
 
   if (!data.persona) {

@@ -3,8 +3,6 @@ import { GoogleGenAI } from '@google/genai';
 import { getStorage } from 'firebase-admin/storage';
 import * as crypto from 'crypto';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export const generateImage = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
   secrets: ['GEMINI_API_KEY'],
@@ -13,6 +11,7 @@ export const generateImage = onCall({
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
 
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const { prompt } = request.data;
 
   if (!prompt) {
