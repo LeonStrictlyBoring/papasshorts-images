@@ -3,39 +3,34 @@ import { GoogleGenAI } from '@google/genai';
 import { getStorage } from 'firebase-admin/storage';
 import * as crypto from 'crypto';
 
-const ai = new GoogleGenAI({
-  vertexai: true,
-  project: 'bildgenerierung-495412',
-  location: 'europe-west3',
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const generateImage = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
+  secrets: ['GEMINI_API_KEY'],
 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
 
-  const { prompt, aspectRatio = '1:1' } = request.data;
+  const { prompt } = request.data;
 
   if (!prompt) {
     throw new HttpsError('invalid-argument', 'Prompt fehlt');
   }
 
-  const response = await ai.models.generateImages({
-    model: 'imagen-3.0-generate-001',
-    prompt: prompt,
-    config: {
-      numberOfImages: 1,
-      outputMimeType: 'image/jpeg',
-      aspectRatio: aspectRatio,
-    },
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-image-preview',
+    contents: prompt,
+    config: { responseModalities: ['IMAGE'] },
   });
 
-  const rawBytes = response.generatedImages![0].image!.imageBytes!;
-  const buffer = typeof rawBytes === 'string'
-    ? Buffer.from(rawBytes, 'base64')
-    : Buffer.from(rawBytes as Uint8Array);
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+  if (!imagePart?.inlineData?.data) {
+    throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen: kein Bild in der Antwort');
+  }
+  const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
 
   const filename = `generated/${crypto.randomUUID()}.jpg`;
   const bucket = getStorage().bucket();

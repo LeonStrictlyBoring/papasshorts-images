@@ -35,11 +35,7 @@ interface GenerateModelImagesRequest {
   customArchetype?: string;
 }
 
-const ai = new GoogleGenAI({
-  vertexai: true,
-  project: 'bildgenerierung-495412',
-  location: 'europe-west3',
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const NUMBER_OF_IMAGES = 4;
 
 function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): string {
@@ -77,6 +73,7 @@ function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): st
 
 export const generateModelImages = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
+  secrets: ['GEMINI_API_KEY'],
 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
@@ -112,34 +109,35 @@ export const generateModelImages = onCall({
   const userId = request.auth.uid;
   const timestamp = Date.now();
 
-  let response;
+  let responses: Awaited<ReturnType<typeof ai.models.generateContent>>[];
   try {
-    response = await ai.models.generateImages({
-      model: 'imagen-3.0-generate-001',
-      prompt: finalPrompt,
-      config: {
-        numberOfImages: NUMBER_OF_IMAGES,
-        outputMimeType: 'image/jpeg',
-        aspectRatio: '1:1',
-      },
-    });
+    responses = await Promise.all(
+      Array.from({ length: NUMBER_OF_IMAGES }, () =>
+        ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview',
+          contents: finalPrompt,
+          config: { responseModalities: ['IMAGE'] },
+        })
+      )
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-      throw new HttpsError('resource-exhausted', 'Imagen API Quota überschritten');
+      throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
     }
-    logger.error('Imagen API Fehler', err);
+    logger.error('Gemini API Fehler', err);
     throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen');
   }
 
   const bucket = getStorage().bucket();
   const images: { url: string; storagePath: string }[] = [];
 
-  for (let i = 0; i < (response.generatedImages?.length ?? 0); i++) {
-    const rawBytes = response.generatedImages![i].image!.imageBytes!;
-    const buffer = typeof rawBytes === 'string'
-      ? Buffer.from(rawBytes, 'base64')
-      : Buffer.from(rawBytes as Uint8Array);
+  for (let i = 0; i < responses.length; i++) {
+    const parts = responses[i].candidates?.[0]?.content?.parts ?? [];
+    const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+    if (!imagePart?.inlineData?.data) continue;
+
+    const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
     const storagePath = `generated/models/${userId}/${timestamp}/${i}.jpg`;
     const file = bucket.file(storagePath);
 
