@@ -19,6 +19,7 @@ const navItems: NavItem[] = [
   { label: 'Model erstellen', href: '/models/create', indent: true, visibleWhen: '/models' },
   { label: 'Artikel', href: '/artikel' },
   { label: 'Settings', href: '/settings' },
+  { label: 'Setting erstellen', href: '/settings/create', indent: true, visibleWhen: '/settings' },
   { label: 'Shootings', href: '/shootings' },
   { label: 'Profil', href: '/profil' },
   { label: 'Nutzerverwaltung', href: '/profil/nutzerverwaltung', indent: true, requiresAdmin: true },
@@ -32,6 +33,7 @@ export default function Sidebar() {
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
     if (href === '/models') return pathname === '/models'
+    if (href === '/settings') return pathname === '/settings'
     return pathname.startsWith(href)
   }
 

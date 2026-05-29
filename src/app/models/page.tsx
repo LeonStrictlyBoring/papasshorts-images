@@ -102,7 +102,7 @@ export default function ModelsPage() {
       )}
 
       {!loading && models.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {models.map(model => {
             const archetypeLabels = [
               ...(model.sedcard?.archetypes ?? []).map(a => a.split(' (')[0]),
