@@ -33,6 +33,10 @@ interface GenerateModelImagesRequest {
   appearance: Appearance;
   archetypes: string[];
   customArchetype?: string;
+  refinement?: {
+    storagePath: string;
+    text: string;
+  };
 }
 
 const NUMBER_OF_IMAGES = 4;
@@ -73,6 +77,8 @@ function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): st
 export const generateModelImages = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
   secrets: ['GEMINI_API_KEY'],
+  timeoutSeconds: 540,
+  memory: '512MiB',
 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
@@ -94,7 +100,14 @@ export const generateModelImages = onCall({
     throw new HttpsError('invalid-argument', 'Pflichtfeld fehlt: archetypes');
   }
 
-  const promptDoc = await getFirestore().collection('prompts').doc('model-creation').get();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let promptDoc: any;
+  try {
+    promptDoc = await getFirestore().collection('prompts').doc('model-creation').get();
+  } catch (err) {
+    logger.error('Firestore-Fehler beim Lesen des System-Prompts', { errString: String(err) });
+    throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts');
+  }
   if (!promptDoc.exists) {
     throw new HttpsError('not-found', 'System-Prompt "model-creation" nicht in Firestore gefunden');
   }
@@ -109,23 +122,41 @@ export const generateModelImages = onCall({
   const userId = request.auth.uid;
   const timestamp = Date.now();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let contents: any = finalPrompt;
+  if (data.refinement) {
+    try {
+      const [imgBuf] = await getStorage().bucket().file(data.refinement.storagePath).download();
+      contents = {
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType: 'image/jpeg', data: imgBuf.toString('base64') } },
+          { text: `${finalPrompt}\n\nAnpassungen: ${data.refinement.text}` },
+        ],
+      };
+    } catch (err) {
+      logger.error('Storage-Fehler beim Laden des Referenzbildes', { errString: String(err) });
+      throw new HttpsError('internal', 'Referenzbild konnte nicht geladen werden');
+    }
+  }
+
   let responses: Awaited<ReturnType<typeof ai.models.generateContent>>[];
   try {
     responses = await Promise.all(
       Array.from({ length: NUMBER_OF_IMAGES }, () =>
         ai.models.generateContent({
           model: 'gemini-3-pro-image-preview',
-          contents: finalPrompt,
+          contents,
           config: { responseModalities: ['IMAGE'] },
         })
       )
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error('Gemini API Fehler (raw)', { message, errString: String(err) });
     if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
       throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
     }
-    logger.error('Gemini API Fehler', err);
     throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen');
   }
 

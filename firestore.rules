@@ -42,5 +42,15 @@ service cloud.firestore {
     match /prompts/{promptId} {
       allow read, write: if isDeveloper();
     }
+
+    // models collection
+    match /models/{modelId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      // users may only set the archived flag (soft delete)
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived']);
+      allow write: if isAdminOrDeveloper();
+    }
   }
 }
