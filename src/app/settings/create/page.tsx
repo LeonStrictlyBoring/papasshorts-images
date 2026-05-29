@@ -155,11 +155,13 @@ export default function SettingCreatePage() {
     if (saveDialogIdx === null || !result || !saveName.trim()) return
     setSaving(true); setSaveError(null)
     try {
+      // JSON round-trip strips undefined values which Firestore rejects
+      const briefing = JSON.parse(JSON.stringify(buildPayload()))
       await addDoc(collection(db, 'settings'), {
         imageUrl: result.images[saveDialogIdx].url,
         storagePath: result.images[saveDialogIdx].storagePath,
         name: saveName.trim(),
-        briefing: buildPayload(),
+        briefing,
         createdAt: Timestamp.now(),
         createdBy: userDoc?.name ?? 'Unbekannt',
       })
