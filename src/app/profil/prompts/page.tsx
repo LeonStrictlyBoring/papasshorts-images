@@ -72,7 +72,27 @@ const PROMPTS: { id: PromptId; label: string; placeholders?: Placeholder[] }[] =
       { key: '{{mood_adjektive}}',    description: 'Mood-Adjektive, kommagetrennt' },
     ],
   },
-  { id: 'shooting-creation', label: 'Shooting erstellen' },
+  {
+    id: 'shooting-creation',
+    label: 'Shooting erstellen',
+    placeholders: [
+      { key: '{{model_artikel_setting}}', description: 'Automatisch generierte Beschreibung: welches Model (mit Bildnummer) welche Artikel trägt + Setting (mit Bildnummer)' },
+      { key: '{{regie_beschreibung}}',    description: 'Freitext-Beschreibung der Regieanweisungen' },
+      { key: '{{posing_typ}}',            description: 'Posing-Typ (z.B. Dynamic Walk, Standing 3/4 view)' },
+      { key: '{{arm_haltung}}',           description: 'Arm- & Handhaltung' },
+      { key: '{{koerper_spannung}}',      description: 'Körperspannung & Fluss' },
+      { key: '{{bildausschnitt}}',        description: 'Bildausschnitt (z.B. Full body shot, Medium shot)' },
+      { key: '{{kamerawinkel}}',          description: 'Kamerawinkel (z.B. Eye-level, Low-angle)' },
+      { key: '{{objektiv}}',              description: 'Objektiv-Charakteristik (z.B. 85mm, 50mm, 35mm)' },
+      { key: '{{blickkontakt}}',          description: 'Blickkontakt (z.B. Looking directly into the camera)' },
+      { key: '{{gesichtsausdruck}}',      description: 'Gesichtsausdruck (z.B. Neutral expression)' },
+      { key: '{{stoff_dynamik}}',         description: 'Stoff-Dynamik (z.B. Fabric blowing in the wind)' },
+      { key: '{{fokus_bereich}}',         description: 'Fokus-Bereich (Freitext, z.B. Focus on the texture)' },
+      { key: '{{fotografie_stil}}',       description: 'Fotografie-Stil (z.B. Commercial fashion photography)' },
+      { key: '{{bildschaerfe}}',          description: 'Bildschärfe & Hintergrund (z.B. Shallow depth of field)' },
+      { key: '{{realismus}}',             description: 'Aktive Realismus-Flags (Photorealistic, Candid look, Film grain) kommagetrennt' },
+    ],
+  },
 ]
 
 const inputCls = 'border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange w-full resize-y'
