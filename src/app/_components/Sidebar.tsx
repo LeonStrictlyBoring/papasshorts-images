@@ -10,11 +10,13 @@ interface NavItem {
   indent?: boolean
   requiresAdmin?: boolean
   requiresDeveloper?: boolean
+  visibleWhen?: string
 }
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', href: '/' },
   { label: 'Models', href: '/models' },
+  { label: 'Model erstellen', href: '/models/create', indent: true, visibleWhen: '/models' },
   { label: 'Artikel', href: '/artikel' },
   { label: 'Settings', href: '/settings' },
   { label: 'Shootings', href: '/shootings' },
@@ -29,12 +31,14 @@ export default function Sidebar() {
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
+    if (href === '/models') return pathname === '/models'
     return pathname.startsWith(href)
   }
 
   const visibleItems = navItems.filter((item) => {
     if (item.requiresDeveloper && !isDeveloper) return false
     if (item.requiresAdmin && !isAdmin) return false
+    if (item.visibleWhen && !pathname.startsWith(item.visibleWhen)) return false
     return true
   })
 

@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
-import { functions, db } from '@/lib/firebase'
+import { ref, getDownloadURL } from 'firebase/storage'
+import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
 
 const ARCHETYPES = [
@@ -188,8 +189,9 @@ export default function ModelCreatePage() {
     if (saveDialogIdx === null || !result || !saveName.trim()) return
     setSaving(true); setSaveError(null)
     try {
+      const permanentUrl = await getDownloadURL(ref(storage, result.images[saveDialogIdx].storagePath))
       await addDoc(collection(db, 'models'), {
-        imageUrl: result.images[saveDialogIdx].url,
+        imageUrl: permanentUrl,
         storagePath: result.images[saveDialogIdx].storagePath,
         name: saveName.trim(),
         sedcard: {
