@@ -42,7 +42,36 @@ const PROMPTS: { id: PromptId; label: string; placeholders?: Placeholder[] }[] =
       { key: '{{archetypen}}',         description: 'Gewählte Archetypen, kommagetrennt' },
     ],
   },
-  { id: 'setting-creation', label: 'Setting erstellen' },
+  {
+    id: 'setting-creation',
+    label: 'Setting erstellen',
+    placeholders: [
+      { key: '{{beschreibung}}',      description: 'Freitext-Beschreibung des Settings' },
+      { key: '{{location_typ}}',      description: 'Location-Typ (Indoor / Outdoor Urban / Outdoor Natur)' },
+      { key: '{{raum_typ}}',          description: 'Indoor: Raum-Typ' },
+      { key: '{{architekturstil}}',   description: 'Indoor: Architekturstil' },
+      { key: '{{oberflaechen}}',      description: 'Indoor: Oberflächen & Wandstrukturen' },
+      { key: '{{bodenbelag_indoor}}', description: 'Indoor: Bodenbelag' },
+      { key: '{{umfeld}}',            description: 'Outdoor Urban: Umfeld & Szenerie' },
+      { key: '{{staedtischer_vibe}}', description: 'Outdoor Urban: Städtischer Vibe' },
+      { key: '{{bodenbelag_urban}}',  description: 'Outdoor Urban: Bodenbeschaffenheit' },
+      { key: '{{hintergrund}}',       description: 'Outdoor Urban: Hintergrund-Elemente' },
+      { key: '{{landschafts_typ}}',   description: 'Outdoor Natur: Landschafts-Typ' },
+      { key: '{{vegetation}}',        description: 'Outdoor Natur: Vegetation & Dichte' },
+      { key: '{{bodenbelag_natur}}',  description: 'Outdoor Natur: Bodenbeschaffenheit' },
+      { key: '{{naturelemente}}',     description: 'Outdoor Natur: Dominante Naturelemente' },
+      { key: '{{licht_charakter}}',   description: 'Licht-Charakter' },
+      { key: '{{lichtquelle}}',       description: 'Lichtquelle' },
+      { key: '{{tageszeit}}',         description: 'Tageszeit / Stimmung' },
+      { key: '{{farben}}',            description: 'Dominante Farben (Hex-Werte, kommagetrennt)' },
+      { key: '{{farbsaettigung}}',    description: 'Farbsättigung' },
+      { key: '{{set_dichte}}',        description: 'Dichte des Sets (Minimalistisch / Medium / Maximalistisch)' },
+      { key: '{{moebler}}',           description: 'Möbel und Objekte' },
+      { key: '{{kleindekoration}}',   description: 'Kleindekoration & organische Elemente' },
+      { key: '{{stilrichtung}}',      description: 'Stilrichtung / Ära' },
+      { key: '{{mood_adjektive}}',    description: 'Mood-Adjektive, kommagetrennt' },
+    ],
+  },
   { id: 'shooting-creation', label: 'Shooting erstellen' },
 ]
 
@@ -111,9 +140,7 @@ function PromptSection({ id, label, placeholders }: { id: PromptId; label: strin
 
       {placeholders && placeholders.length > 0 && (
         <div className="space-y-2 pb-2 border-b border-navy/10">
-          <p className="text-xs text-navy/50">
-            Dieser Prompt wird mit den Sedcard-Daten des Models bestückt. Verfügbare Platzhalter:
-          </p>
+          <p className="text-xs text-navy/50">Verfügbare Platzhalter:</p>
           <ul className="space-y-1">
             {placeholders.map((p) => (
               <li key={p.key} className="flex items-baseline gap-2 text-sm">

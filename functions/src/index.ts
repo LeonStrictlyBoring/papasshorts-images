@@ -6,4 +6,5 @@ setGlobalOptions({ maxInstances: 10, region: 'europe-west3' });
 
 export { generateImage } from './generateImage';
 export { generateModelImages } from './generateModelImages';
+export { generateSettingImages } from './generateSettingImages';
 export { createUser, deleteUser } from './userManagement';
