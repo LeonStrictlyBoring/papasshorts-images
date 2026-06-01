@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
 import { functions, db } from '@/lib/firebase'
@@ -23,6 +23,17 @@ const labelTextCls = 'text-sm text-navy/70'
 
 interface GeneratedImage { url: string; storagePath: string }
 interface GenerationResult { images: GeneratedImage[]; promptUsed: string; generationId: string }
+
+interface RefinementRecord {
+  sourceLabel: string
+  text: string
+  images: GeneratedImage[]
+  imageStates: Record<number, ImageState>
+  selectedIdx: number | null
+}
+
+interface SaveTarget { url: string; storagePath: string; rIdx?: number; imgIdx: number }
+interface DiscardTarget { rIdx?: number; imgIdx: number }
 
 export default function SettingCreatePage() {
   // Form state
@@ -66,20 +77,33 @@ export default function SettingCreatePage() {
   // Image interaction
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [imageStates, setImageStates] = useState<Record<number, ImageState>>({})
-  const [discardDialogIdx, setDiscardDialogIdx] = useState<number | null>(null)
-  const [saveDialogIdx, setSaveDialogIdx] = useState<number | null>(null)
+  const [saveTarget, setSaveTarget] = useState<SaveTarget | null>(null)
+  const [discardTarget, setDiscardTarget] = useState<DiscardTarget | null>(null)
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Refinement
-  const [refinementSource, setRefinementSource] = useState<number | null>(null)
+  // Refinement history
+  const [refinementHistory, setRefinementHistory] = useState<RefinementRecord[]>([])
+
+  // Refinement panel
+  const [refinementSource, setRefinementSource] = useState<{ storagePath: string; label: string } | null>(null)
   const [refinementText, setRefinementText] = useState('')
   const [refining, setRefining] = useState(false)
   const [refineError, setRefineError] = useState<string | null>(null)
 
+  // Zoom
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
+
   const resultsRef = useRef<HTMLDivElement>(null)
   const { userDoc } = useAuth()
+
+  useEffect(() => {
+    if (!zoomUrl) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomUrl(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomUrl])
 
   function toggleMood(label: string) {
     setMoodAdjektive(prev => {
@@ -133,8 +157,9 @@ export default function SettingCreatePage() {
     setStilrichtung(''); setMoodAdjektive(new Set()); setAnderesVibe('')
     setReferenceImages([])
     setSubmitted(false); setResult(null); setSelectedIdx(null); setImageStates({})
-    setError(null); setDiscardDialogIdx(null); setSaveDialogIdx(null); setSaveName('')
+    setError(null); setDiscardTarget(null); setSaveTarget(null); setSaveName('')
     setRefinementSource(null); setRefinementText(''); setRefineError(null)
+    setRefinementHistory([]); setZoomUrl(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -142,32 +167,62 @@ export default function SettingCreatePage() {
     const state = imageStates[i] ?? 'active'
     if (state === 'discarded' || state === 'saved') return
     setSelectedIdx(prev => prev === i ? null : i)
-    if (refinementSource !== null) { setRefinementSource(null); setRefinementText('') }
+    setRefinementSource(null); setRefinementText('')
   }
 
-  function confirmDiscard(i: number) {
-    setImageStates(prev => ({ ...prev, [i]: 'discarded' }))
-    setDiscardDialogIdx(null)
-    if (selectedIdx === i) setSelectedIdx(null)
+  function handleRefinementImageClick(rIdx: number, i: number) {
+    const state = refinementHistory[rIdx]?.imageStates[i] ?? 'active'
+    if (state === 'discarded' || state === 'saved') return
+    setRefinementHistory(prev => prev.map((r, ri) =>
+      ri === rIdx ? { ...r, selectedIdx: r.selectedIdx === i ? null : i } : { ...r, selectedIdx: null }
+    ))
+    setSelectedIdx(null)
+    setRefinementSource(null); setRefinementText('')
+  }
+
+  function confirmDiscard() {
+    if (!discardTarget) return
+    if (discardTarget.rIdx !== undefined) {
+      const rIdx = discardTarget.rIdx
+      setRefinementHistory(prev => prev.map((r, ri) =>
+        ri === rIdx
+          ? { ...r, imageStates: { ...r.imageStates, [discardTarget.imgIdx]: 'discarded' },
+              selectedIdx: r.selectedIdx === discardTarget.imgIdx ? null : r.selectedIdx }
+          : r
+      ))
+    } else {
+      setImageStates(prev => ({ ...prev, [discardTarget.imgIdx]: 'discarded' }))
+      if (selectedIdx === discardTarget.imgIdx) setSelectedIdx(null)
+    }
+    setDiscardTarget(null)
   }
 
   async function handleSave() {
-    if (saveDialogIdx === null || !result || !saveName.trim()) return
+    if (!saveTarget || !saveName.trim()) return
     setSaving(true); setSaveError(null)
     try {
-      // JSON round-trip strips undefined values which Firestore rejects
       const briefing = JSON.parse(JSON.stringify(buildPayload()))
       await addDoc(collection(db, 'settings'), {
-        imageUrl: result.images[saveDialogIdx].url,
-        storagePath: result.images[saveDialogIdx].storagePath,
+        imageUrl: saveTarget.url,
+        storagePath: saveTarget.storagePath,
         name: saveName.trim(),
         briefing,
         createdAt: Timestamp.now(),
         createdBy: userDoc?.name ?? 'Unbekannt',
       })
-      setImageStates(prev => ({ ...prev, [saveDialogIdx]: 'saved' }))
-      setSaveDialogIdx(null); setSaveName('')
-      if (selectedIdx === saveDialogIdx) setSelectedIdx(null)
+      if (saveTarget.rIdx !== undefined) {
+        const rIdx = saveTarget.rIdx
+        setRefinementHistory(prev => prev.map((r, ri) =>
+          ri === rIdx
+            ? { ...r, imageStates: { ...r.imageStates, [saveTarget.imgIdx]: 'saved' },
+                selectedIdx: r.selectedIdx === saveTarget.imgIdx ? null : r.selectedIdx }
+            : r
+        ))
+      } else {
+        setImageStates(prev => ({ ...prev, [saveTarget.imgIdx]: 'saved' }))
+        if (selectedIdx === saveTarget.imgIdx) setSelectedIdx(null)
+      }
+      setSaveTarget(null); setSaveName('')
     } catch {
       setSaveError('Speichern fehlgeschlagen. Bitte erneut versuchen.')
     } finally {
@@ -176,15 +231,18 @@ export default function SettingCreatePage() {
   }
 
   async function handleRefine() {
-    if (refinementSource === null || !result || !refinementText.trim()) return
+    if (!refinementSource || !refinementText.trim()) return
     setRefining(true); setRefineError(null)
     try {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages')
-      const response = await fn(buildPayload({
-        storagePath: result.images[refinementSource].storagePath,
+      const response = await fn(buildPayload({ storagePath: refinementSource.storagePath, text: refinementText.trim() }))
+      setRefinementHistory(prev => [...prev, {
+        sourceLabel: refinementSource.label,
         text: refinementText.trim(),
-      }))
-      setResult(prev => prev ? { ...prev, images: [...prev.images, ...response.data.images] } : response.data)
+        images: response.data.images,
+        imageStates: {},
+        selectedIdx: null,
+      }])
       setRefinementSource(null); setRefinementText(''); setSelectedIdx(null)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } catch (err: unknown) {
@@ -192,6 +250,28 @@ export default function SettingCreatePage() {
     } finally {
       setRefining(false)
     }
+  }
+
+  function ZoomButton({ url }: { url: string }) {
+    return (
+      <button type="button" onClick={() => setZoomUrl(url)}
+        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
+        aria-label="Vergrößern">
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-7-4v8m-4-4h8" />
+        </svg>
+      </button>
+    )
+  }
+
+  function ActionButtons({ onDiscard, onSave, onRefine }: { onDiscard: () => void; onSave: () => void; onRefine: () => void }) {
+    return (
+      <div className="flex flex-col gap-1">
+        <button type="button" onClick={onDiscard} className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">Verwerfen</button>
+        <button type="button" onClick={onSave} className="text-sm font-medium py-1.5 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">Speichern</button>
+        <button type="button" onClick={onRefine} className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">Verfeinern</button>
+      </div>
+    )
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -515,45 +595,90 @@ export default function SettingCreatePage() {
             <h2 className="text-2xl font-bold text-navy">Deine Setting-Varianten</h2>
             <p className="text-sm text-navy/60 mt-1">Klicke auf ein Bild, um es auszuwählen.</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
+          {/* Original batch */}
+          <div className="grid grid-cols-3 gap-4 items-start">
             {result.images.map((img, i) => {
               const state = imageStates[i] ?? 'active'
               if (state === 'discarded') return null
               const isSelected = selectedIdx === i
               return (
                 <div key={img.storagePath} className="flex flex-col gap-2">
-                  <button type="button" disabled={state === 'saved'} onClick={() => handleImageClick(i)}
-                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-colors ${isSelected ? 'border-orange' : state === 'saved' ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'}`}
-                    aria-label={`Setting-Variante ${i + 1}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={`Setting-Variante ${i + 1}`} className="w-full h-full object-cover" />
-                    {state === 'saved' && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
+                  <div className="relative">
+                    <button type="button" disabled={state === 'saved'} onClick={() => handleImageClick(i)}
+                      className={`relative w-full aspect-square overflow-hidden rounded-lg border-2 transition-colors ${isSelected ? 'border-orange' : state === 'saved' ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'}`}
+                      aria-label={`Setting-Variante ${i + 1}`}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={`Setting-Variante ${i + 1}`} className="w-full h-full object-cover" />
+                      {state === 'saved' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                    <ZoomButton url={img.url} />
+                  </div>
                   {isSelected && state === 'active' && (
-                    <div className="flex flex-col gap-1">
-                      <button type="button" onClick={() => setDiscardDialogIdx(i)}
-                        className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">Verwerfen</button>
-                      <button type="button" onClick={() => { setSaveDialogIdx(i); setSaveName('') }}
-                        className="text-sm font-medium py-1.5 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">Speichern</button>
-                      <button type="button" onClick={() => { setRefinementSource(i); setSelectedIdx(null) }}
-                        className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">Verfeinern</button>
-                    </div>
+                    <ActionButtons
+                      onDiscard={() => setDiscardTarget({ imgIdx: i })}
+                      onSave={() => { setSaveTarget({ url: img.url, storagePath: img.storagePath, imgIdx: i }); setSaveName('') }}
+                      onRefine={() => { setRefinementSource({ storagePath: img.storagePath, label: `Variante ${i + 1}` }); setSelectedIdx(null) }}
+                    />
                   )}
                 </div>
               )
             })}
           </div>
 
+          {/* Refinement history */}
+          {refinementHistory.map((record, rIdx) => (
+            <div key={rIdx} className="space-y-4 pt-4 border-t border-navy/10">
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-navy">{record.sourceLabel} verfeinern</p>
+                <p className="text-sm text-navy/60">Anpassungen: {record.text}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 items-start">
+                {record.images.map((img, i) => {
+                  const state = record.imageStates[i] ?? 'active'
+                  if (state === 'discarded') return null
+                  const isSelected = record.selectedIdx === i
+                  return (
+                    <div key={img.storagePath} className="flex flex-col gap-2">
+                      <div className="relative">
+                        <button type="button" disabled={state === 'saved'} onClick={() => handleRefinementImageClick(rIdx, i)}
+                          className={`relative w-full aspect-square overflow-hidden rounded-lg border-2 transition-colors ${isSelected ? 'border-orange' : state === 'saved' ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'}`}
+                          aria-label={`Verfeinerung ${rIdx + 1}, Variante ${i + 1}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={img.url} alt={`Verfeinerung ${rIdx + 1}, Variante ${i + 1}`} className="w-full h-full object-cover" />
+                          {state === 'saved' && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                        <ZoomButton url={img.url} />
+                      </div>
+                      {isSelected && state === 'active' && (
+                        <ActionButtons
+                          onDiscard={() => setDiscardTarget({ rIdx, imgIdx: i })}
+                          onSave={() => { setSaveTarget({ url: img.url, storagePath: img.storagePath, rIdx, imgIdx: i }); setSaveName('') }}
+                          onRefine={() => { setRefinementSource({ storagePath: img.storagePath, label: `Auswahl` }); setRefinementHistory(prev => prev.map((r, ri) => ri === rIdx ? { ...r, selectedIdx: null } : r)) }}
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
           {/* Refinement panel */}
           {refinementSource !== null && (
             <div className="space-y-4 border border-navy/10 rounded-xl p-5 bg-navy/[0.02]">
-              <p className="text-sm text-navy/50">Variante {refinementSource + 1} verfeinern</p>
+              <p className="text-sm text-navy/50">Auswahl verfeinern</p>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-navy">Anpassungen</span>
                 <textarea rows={4} value={refinementText} onChange={e => setRefinementText(e.target.value)}
@@ -587,15 +712,29 @@ export default function SettingCreatePage() {
         </div>
       )}
 
+      {/* Zoom modal */}
+      {zoomUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setZoomUrl(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]" onClick={e => e.stopPropagation()}>
+            <button type="button" onClick={() => setZoomUrl(null)}
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">×</button>
+            <div className="p-6 h-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomUrl} alt="Zoom" className="w-full h-full rounded-lg object-contain object-left" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Discard dialog */}
-      {discardDialogIdx !== null && (
+      {discardTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl p-6 w-80 space-y-4 shadow-xl">
             <p className="font-semibold text-navy">Sind Sie sicher?</p>
             <div className="flex gap-3">
-              <button type="button" onClick={() => confirmDiscard(discardDialogIdx)}
+              <button type="button" onClick={confirmDiscard}
                 className="flex-1 bg-navy text-white font-semibold py-2 rounded-md hover:bg-navy/90 transition-colors">Verwerfen</button>
-              <button type="button" onClick={() => setDiscardDialogIdx(null)}
+              <button type="button" onClick={() => setDiscardTarget(null)}
                 className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
             </div>
           </div>
@@ -603,7 +742,7 @@ export default function SettingCreatePage() {
       )}
 
       {/* Save dialog */}
-      {saveDialogIdx !== null && (
+      {saveTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl p-6 w-80 space-y-4 shadow-xl">
             <p className="font-semibold text-navy">Setting speichern</p>
@@ -619,7 +758,7 @@ export default function SettingCreatePage() {
                 className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-50">
                 {saving ? 'Wird gespeichert …' : 'Speichern'}
               </button>
-              <button type="button" onClick={() => { setSaveDialogIdx(null); setSaveName(''); setSaveError(null) }} disabled={saving}
+              <button type="button" onClick={() => { setSaveTarget(null); setSaveName(''); setSaveError(null) }} disabled={saving}
                 className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
             </div>
           </div>

@@ -575,7 +575,7 @@ export default function ModelCreatePage() {
           {/* Refinement panel */}
           {refinementSource !== null && (
             <div className="space-y-4 border border-navy/10 rounded-xl p-5 bg-navy/[0.02]">
-              <p className="text-sm text-navy/50">{refinementSource.label} verfeinern</p>
+              <p className="text-sm text-navy/50">Auswahl verfeinern</p>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-navy">Anpassungen</span>
                 <textarea rows={4} value={refinementText} onChange={(e) => setRefinementText(e.target.value)}
@@ -614,14 +614,16 @@ export default function ModelCreatePage() {
 
       {/* Zoom modal */}
       {zoomUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setZoomUrl(null)}>
-          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setZoomUrl(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setZoomUrl(null)}
-              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
               ×
             </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={zoomUrl} alt="Zoom" className="w-full rounded-xl object-contain max-h-[90vh]" />
+            <div className="p-6 h-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomUrl} alt="Zoom" className="w-full h-full rounded-lg object-contain object-left" />
+            </div>
           </div>
         </div>
       )}
