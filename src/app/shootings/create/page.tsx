@@ -19,7 +19,8 @@ interface PoolArtikel {
   imageUrl: string; storagePath: string; kategorie: string; archived?: boolean
 }
 interface PoolSetting {
-  id: string; name: string; imageUrl: string; storagePath: string; archived?: boolean
+  id: string; name: string; imageUrl: string; storagePath: string
+  createdAt: Timestamp; createdBy: string; archived?: boolean
 }
 interface SelectedArtikel {
   id: string; produktname: string; artikelId: string
@@ -105,6 +106,8 @@ export default function ShootingCreatePage() {
   const [poolSettings, setPoolSettings] = useState<PoolSetting[]>([])
   const [poolSettingsLoading, setPoolSettingsLoading] = useState(false)
   const [settingOverlaySelected, setSettingOverlaySelected] = useState<string | null>(null)
+  const [settingSortKey, setSettingSortKey] = useState<'name' | 'createdAt' | 'createdBy'>('createdAt')
+  const [settingSortDir, setSettingSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     if (!zoomUrl) return
@@ -801,22 +804,68 @@ export default function ShootingCreatePage() {
             <p className="font-semibold text-navy">Setting auswählen</p>
             <button type="button" onClick={() => setSettingOverlayOpen(false)} className="text-navy/50 hover:text-navy text-lg">×</button>
           </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            {poolSettingsLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
-            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
-              {poolSettings.map(s => (
-                <button key={s.id} type="button" onClick={() => setSettingOverlaySelected(s.id)}
-                  className={`rounded-xl border-2 overflow-hidden text-left transition-colors ${settingOverlaySelected === s.id ? 'border-orange' : 'border-navy/10 hover:border-navy/30'}`}>
-                  <div className="aspect-video overflow-hidden bg-navy/5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-sm font-medium text-navy px-3 py-2">{s.name}</p>
+          <div className="flex-1 overflow-y-auto">
+            {poolSettingsLoading && (
+              <div className="flex items-center gap-2 text-navy/50 p-6">
+                <div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">Wird geladen …</span>
+              </div>
+            )}
+            {!poolSettingsLoading && poolSettings.length > 0 && (() => {
+              const sorted = [...poolSettings].sort((a, b) => {
+                let cmp = 0
+                if (settingSortKey === 'name') cmp = a.name.localeCompare(b.name)
+                else if (settingSortKey === 'createdAt') cmp = (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0)
+                else cmp = a.createdBy.localeCompare(b.createdBy)
+                return settingSortDir === 'asc' ? cmp : -cmp
+              })
+              const formatDate = (ts: Timestamp) => {
+                const d = ts.toDate()
+                const pad = (n: number) => String(n).padStart(2, '0')
+                return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
+              }
+              const SortBtn = ({ label, k }: { label: string; k: 'name' | 'createdAt' | 'createdBy' }) => (
+                <button type="button" onClick={() => {
+                  if (settingSortKey === k) setSettingSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                  else { setSettingSortKey(k); setSettingSortDir('asc') }
+                }} className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors ${settingSortKey === k ? 'text-orange' : 'text-navy/50 hover:text-navy'}`}>
+                  {label}
+                  <span className="text-[10px]">{settingSortKey === k ? (settingSortDir === 'asc' ? '↑' : '↓') : '↕'}</span>
                 </button>
-              ))}
-            </div>
+              )
+              return (
+                <div className="border-navy/10 overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-navy/5 border-b border-navy/10">
+                      <tr>
+                        <th className="w-16 px-4 py-3" />
+                        <th className="px-4 py-3 text-left"><SortBtn label="Titel" k="name" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="Erstellt" k="createdAt" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="Ersteller" k="createdBy" /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy/5">
+                      {sorted.map(s => (
+                        <tr key={s.id} className={`transition-colors ${settingOverlaySelected === s.id ? 'bg-orange/5' : 'hover:bg-navy/[0.02]'}`}>
+                          <td className="px-4 py-2">
+                            <button type="button" onClick={() => setSettingOverlaySelected(s.id)}
+                              className={`w-12 h-12 rounded-md overflow-hidden border-2 transition-all block ${settingOverlaySelected === s.id ? 'border-orange' : 'border-navy/10 hover:border-orange'}`}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-navy">{s.name}</td>
+                          <td className="px-4 py-3 text-sm text-navy/60 whitespace-nowrap">{s.createdAt ? formatDate(s.createdAt) : '–'}</td>
+                          <td className="px-4 py-3 text-sm text-navy/60">{s.createdBy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
-          <div className="px-6 py-4 border-t border-navy/10 flex gap-3 max-w-2xl mx-auto w-full">
+          <div className="px-6 py-4 border-t border-navy/10 flex gap-3">
             <button type="button" onClick={confirmSettingSelection} disabled={!settingOverlaySelected}
               className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-40">Auswählen</button>
             <button type="button" onClick={() => setSettingOverlayOpen(false)}
