@@ -239,10 +239,10 @@ export const generateShootingShots = onCall({
       const file = bucket.file(storagePath);
       await file.save(buffer, { metadata: { contentType: 'image/jpeg' } });
 
-      const [url] = await file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 60 * 60 * 1000,
-      });
+      const token = crypto.randomUUID();
+      await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+      const encodedPath = storagePath.split('/').map(encodeURIComponent).join('%2F');
+      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
 
       images.push({ url, storagePath });
     }
