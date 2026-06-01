@@ -59,6 +59,7 @@ const inputCls = 'border border-navy/20 rounded-md px-3 py-2 text-navy placehold
 export default function ShootingCreatePage() {
   const { userDoc } = useAuth()
   const streamRef = useRef<HTMLDivElement>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [modelBlocks, setModelBlocks] = useState<ModelBlock[]>([{ blockId: '1', model: null, artikel: [] }])
@@ -237,6 +238,7 @@ export default function ShootingCreatePage() {
       const res = await fn(payload)
       if (!res.data.images?.length) {
         setGenError('Kein Bild generiert. Bitte erneut versuchen.')
+        setTimeout(() => errorRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         return
       }
       const newBlock: ShotBlock = {
@@ -254,6 +256,7 @@ export default function ShootingCreatePage() {
       setTimeout(() => streamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100)
     } catch (err: unknown) {
       setGenError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setTimeout(() => errorRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } finally {
       setGenerating(false)
     }
@@ -601,7 +604,7 @@ export default function ShootingCreatePage() {
 
       {/* ── Error ── */}
       {genError && (
-        <div className="p-4 border border-red-300 bg-red-50 rounded-lg space-y-3">
+        <div ref={errorRef} className="p-4 border border-red-300 bg-red-50 rounded-lg space-y-3">
           <p className="text-sm text-red-700">{genError}</p>
           <button type="button" onClick={handleVerwerfenNeu} disabled={generating}
             className="text-sm font-medium text-orange hover:text-orange/80 transition-colors disabled:opacity-50">
