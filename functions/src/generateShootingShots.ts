@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
+import { checkRateLimit } from './rateLimit';
 
 interface ModelInput {
   name: string;
@@ -121,6 +122,8 @@ export const generateShootingShots = onCall({
 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login erforderlich');
 
+  await checkRateLimit(request.auth.uid);
+
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const data = request.data as GenerateShootingShotsRequest;
 
@@ -232,10 +235,10 @@ export const generateShootingShots = onCall({
       const file = bucket.file(storagePath);
       await file.save(buffer, { metadata: { contentType: 'image/jpeg' } });
 
-      const token = crypto.randomUUID();
-      await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
-      const encodedPath = storagePath.split('/').map(encodeURIComponent).join('%2F');
-      const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+      const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 60 * 60 * 1000,
+      });
 
       images.push({ url, storagePath });
     }

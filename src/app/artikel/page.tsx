@@ -146,6 +146,18 @@ export default function ArtikelPage() {
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setUploadError('Nur JPG, PNG und WebP sind erlaubt.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('Datei zu groß. Maximal 10 MB erlaubt.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    setUploadError(null)
     if (uploadPreview) URL.revokeObjectURL(uploadPreview)
     setUploadFile(file)
     setUploadPreview(URL.createObjectURL(file))

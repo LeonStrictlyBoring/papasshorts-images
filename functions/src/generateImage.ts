@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { GoogleGenAI } from '@google/genai';
 import { getStorage } from 'firebase-admin/storage';
 import * as crypto from 'crypto';
+import { checkRateLimit } from './rateLimit';
 
 export const generateImage = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
@@ -10,6 +11,8 @@ export const generateImage = onCall({
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
+
+  await checkRateLimit(request.auth.uid);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const { prompt } = request.data;

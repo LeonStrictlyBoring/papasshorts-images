@@ -5,6 +5,21 @@ import Link from 'next/link'
 import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
+async function downloadImage(url: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = 'shooting.jpg'
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
 interface Shooting {
   id: string
   imageUrl: string
@@ -46,6 +61,14 @@ export default function ShootingsPage() {
   const [filterTo, setFilterTo] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [zoomShooting, setZoomShooting] = useState<Shooting | null>(null)
+
+  useEffect(() => {
+    if (!zoomShooting) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomShooting(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomShooting])
 
   useEffect(() => {
     async function load() {
@@ -184,10 +207,11 @@ export default function ShootingsPage() {
                     <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelect(s.id)} className="w-4 h-4 accent-orange" />
                   </td>
                   <td className="px-2 py-2">
-                    <div className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5">
+                    <button type="button" onClick={() => setZoomShooting(s)}
+                      className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5 hover:ring-2 hover:ring-orange transition-all block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={s.imageUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-navy">{(s.models || []).join(', ') || '–'}</td>
                   <td className="px-4 py-3 text-sm text-navy">{s.setting || '–'}</td>
@@ -200,6 +224,60 @@ export default function ShootingsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Zoom modal */}
+      {zoomShooting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setZoomShooting(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]"
+            onClick={e => e.stopPropagation()}>
+            <button type="button" onClick={() => setZoomShooting(null)}
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
+              ×
+            </button>
+
+            <div className="p-6 flex gap-6 h-full">
+              {/* Bild */}
+              <div className="flex-1 min-w-0 h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={zoomShooting.imageUrl} alt="Shooting" className="w-full h-full rounded-lg object-contain object-left" />
+              </div>
+
+              {/* Details + Download, unten bündig */}
+              <div className="w-80 shrink-0 flex flex-col justify-end gap-4">
+                <div className="space-y-2">
+                  {[
+                    { label: 'Model(s)', value: (zoomShooting.models || []).join(', ') || '–' },
+                    { label: 'Setting',  value: zoomShooting.setting || '–' },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">{label}</span>
+                      <p className="text-sm text-navy mt-0.5">{value}</p>
+                    </div>
+                  ))}
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">Artikel</span>
+                    <p className="text-sm text-navy mt-0.5">
+                      {(zoomShooting.artikel || []).length > 0
+                        ? (zoomShooting.artikel || []).map(a => `${a.produktname} (${a.artikelId})`).join(', ')
+                        : '–'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">Erstellt</span>
+                    <p className="text-sm text-navy/60 mt-0.5">{formatDate(zoomShooting.createdAt)} von {zoomShooting.createdBy}</p>
+                  </div>
+                </div>
+
+                <button type="button" onClick={() => downloadImage(zoomShooting.imageUrl)}
+                  className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors w-full justify-center">
+                  ↓ Bild herunterladen
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

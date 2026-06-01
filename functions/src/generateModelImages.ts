@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
+import { checkRateLimit } from './rateLimit';
 
 interface BodyMeasurements {
   height?: string;
@@ -83,6 +84,8 @@ export const generateModelImages = onCall({
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Login erforderlich');
   }
+
+  await checkRateLimit(request.auth.uid);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const data = request.data as GenerateModelImagesRequest;
