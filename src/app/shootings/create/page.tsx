@@ -233,7 +233,7 @@ export default function ShootingCreatePage() {
   async function generate(payload: ReturnType<typeof buildPayload>) {
     setGenerating(true); setGenError(null)
     try {
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots', { timeout: 540000 })
       const res = await fn(payload)
       if (!res.data.images?.length) {
         setGenError('Kein Bild generiert. Bitte erneut versuchen.')
@@ -274,7 +274,7 @@ export default function ShootingCreatePage() {
     try {
       const block = shotBlocks.find(b => b.id === blockId)
       if (!block || block.selectedIdx === null) return
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots', { timeout: 540000 })
       const res = await fn(buildPayload({
         storagePath: block.shots[block.selectedIdx].storagePath,
         text: block.refinementText,
