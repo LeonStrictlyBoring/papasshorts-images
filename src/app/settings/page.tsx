@@ -59,9 +59,20 @@ export default function SettingsPage() {
     async function load() {
       try {
         const snap = await getDocs(query(collection(db, 'settings'), orderBy('createdAt', 'desc')))
-        setSettings(
-          snap.docs.map(d => ({ id: d.id, ...d.data() } as Setting)).filter(s => !s.archived)
-        )
+        const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() } as Setting)).filter(s => !s.archived)
+        setSettings(loaded)
+
+        // Heal any expired signed URLs (contain 'X-Goog-Signature' → not a permanent token URL)
+        for (const s of loaded) {
+          if (!s.storagePath) continue
+          if (s.imageUrl?.includes('X-Goog-Signature') || s.imageUrl?.includes('Expires=')) {
+            try {
+              const fresh = await getDownloadURL(ref(storage, s.storagePath))
+              setSettings(prev => prev.map(x => x.id === s.id ? { ...x, imageUrl: fresh } : x))
+              await updateDoc(doc(db, 'settings', s.id), { imageUrl: fresh })
+            } catch { /* silent */ }
+          }
+        }
       } finally {
         setLoading(false)
       }
