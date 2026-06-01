@@ -379,18 +379,32 @@ export default function ShootingCreatePage() {
           </button>
         </section>
       ) : (
-        <section className="bg-navy/5 rounded-xl p-5 space-y-3">
+        <section className="bg-navy/5 rounded-xl p-5 space-y-4">
           <h3 className="text-base font-bold text-navy uppercase tracking-wide">Model(s) &amp; Artikel</h3>
-          {modelBlocks.filter(b => b.model).map((block, i) => (
-            <div key={block.blockId} className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-md overflow-hidden border border-navy/10 shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={block.model!.imageUrl} alt={block.model!.name} className="w-full h-full object-cover" />
-              </div>
-              <div>
+          {modelBlocks.filter(b => b.model).map((block) => (
+            <div key={block.blockId} className="space-y-2">
+              {/* Model */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md overflow-hidden border border-navy/10 shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={block.model!.imageUrl} alt={block.model!.name} className="w-full h-full object-cover" />
+                </div>
                 <p className="text-sm font-medium text-navy">{block.model!.name}</p>
-                <p className="text-xs text-navy/50">{block.artikel.map(a => a.produktname).join(', ') || '–'}</p>
               </div>
+              {/* Artikel */}
+              {block.artikel.length > 0 && (
+                <div className="ml-3 pl-3 border-l border-navy/10 space-y-2">
+                  {block.artikel.map(a => (
+                    <div key={a.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-md overflow-hidden border border-navy/10 shrink-0 bg-navy/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-sm text-navy">{a.produktname} <span className="text-navy/40 font-mono text-xs">{a.artikelId}</span></p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </section>
