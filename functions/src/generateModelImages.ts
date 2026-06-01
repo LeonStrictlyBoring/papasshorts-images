@@ -40,7 +40,7 @@ interface GenerateModelImagesRequest {
   };
 }
 
-const NUMBER_OF_IMAGES = 4;
+const NUMBER_OF_IMAGES = 3;
 
 function buildPrompt(systemPrompt: string, data: GenerateModelImagesRequest): string {
   const { persona, bodyMeasurements, appearance, archetypes, customArchetype } = data;
