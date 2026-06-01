@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
@@ -39,6 +39,12 @@ interface GenerationResult {
   generationId: string
 }
 
+interface RefinementRecord {
+  sourceVariantIdx: number
+  text: string
+  images: GeneratedImage[]
+}
+
 type ImageState = 'active' | 'discarded' | 'saved'
 
 export default function ModelCreatePage() {
@@ -69,9 +75,12 @@ export default function ModelCreatePage() {
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
-  // Image interaction
+  // Image interaction (original batch)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [imageStates, setImageStates] = useState<Record<number, ImageState>>({})
+
+  // Refinement history
+  const [refinementHistory, setRefinementHistory] = useState<RefinementRecord[]>([])
 
   // Discard dialog
   const [discardDialogIdx, setDiscardDialogIdx] = useState<number | null>(null)
@@ -88,8 +97,18 @@ export default function ModelCreatePage() {
   const [refining, setRefining] = useState(false)
   const [refineError, setRefineError] = useState<string | null>(null)
 
+  // Zoom
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
+
   const resultsRef = useRef<HTMLDivElement>(null)
   const { userDoc } = useAuth()
+
+  useEffect(() => {
+    if (!zoomUrl) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomUrl(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomUrl])
 
   function toggleArchetype(label: string) {
     setSelectedArchetypes((prev) => {
@@ -169,6 +188,7 @@ export default function ModelCreatePage() {
     setSubmitted(false); setResult(null); setSelectedIdx(null); setImageStates({})
     setError(null); setDiscardDialogIdx(null); setSaveDialogIdx(null); setSaveName('')
     setRefinementSource(null); setRefinementText(''); setRefineError(null)
+    setRefinementHistory([]); setZoomUrl(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -223,9 +243,11 @@ export default function ModelCreatePage() {
         storagePath: result.images[refinementSource].storagePath,
         text: refinementText.trim(),
       }))
-      setResult((prev) =>
-        prev ? { ...prev, images: [...prev.images, ...response.data.images] } : response.data
-      )
+      setRefinementHistory(prev => [...prev, {
+        sourceVariantIdx: refinementSource,
+        text: refinementText.trim(),
+        images: response.data.images,
+      }])
       setRefinementSource(null); setRefinementText(''); setSelectedIdx(null)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } catch (err: unknown) {
@@ -233,6 +255,82 @@ export default function ModelCreatePage() {
     } finally {
       setRefining(false)
     }
+  }
+
+  function ImageGrid({ images, imageStatesMap, selectedIndex, onImageClick, onDiscard, onSave, onRefine }: {
+    images: GeneratedImage[]
+    imageStatesMap: Record<number, ImageState>
+    selectedIndex: number | null
+    onImageClick: (i: number) => void
+    onDiscard: (i: number) => void
+    onSave: (i: number) => void
+    onRefine: (i: number) => void
+  }) {
+    return (
+      <div className="grid grid-cols-3 gap-4 items-start">
+        {images.map((img, i) => {
+          const state = imageStatesMap[i] ?? 'active'
+          if (state === 'discarded') return null
+          const isSelected = selectedIndex === i
+          return (
+            <div key={img.storagePath} className="flex flex-col gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  disabled={state === 'saved'}
+                  onClick={() => onImageClick(i)}
+                  className={`relative w-full aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
+                    isSelected ? 'border-orange'
+                      : state === 'saved' ? 'border-transparent cursor-default'
+                      : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'
+                  }`}
+                  aria-label={`Model-Variante ${i + 1}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt={`Model-Variante ${i + 1}`} className="w-full h-full object-cover" />
+                  {state === 'saved' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+                {/* Zoom icon */}
+                <button
+                  type="button"
+                  onClick={() => setZoomUrl(img.url)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
+                  aria-label="Vergrößern"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-7-4v8m-4-4h8" />
+                  </svg>
+                </button>
+              </div>
+
+              {isSelected && state === 'active' && (
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => onDiscard(i)}
+                    className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
+                    Verwerfen
+                  </button>
+                  <button type="button" onClick={() => onSave(i)}
+                    className="text-sm font-medium py-1.5 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">
+                    Speichern
+                  </button>
+                  <button type="button" onClick={() => onRefine(i)}
+                    className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
+                    Verfeinern
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -501,56 +599,44 @@ export default function ModelCreatePage() {
             <p className="text-sm text-navy/60 mt-1">Klicke auf ein Bild, um es auszuwählen.</p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-start">
-            {result.images.map((img, i) => {
-              const state = imageStates[i] ?? 'active'
-              if (state === 'discarded') return null
-              const isSelected = selectedIdx === i
-              return (
-                <div key={img.storagePath} className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    disabled={state === 'saved'}
-                    onClick={() => handleImageClick(i)}
-                    className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
-                      isSelected ? 'border-orange'
-                        : state === 'saved' ? 'border-transparent cursor-default'
-                        : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'
-                    }`}
-                    aria-label={`Model-Variante ${i + 1}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={`Model-Variante ${i + 1}`} className="w-full h-full object-cover" />
-                    {state === 'saved' && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white"
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                  </button>
+          <ImageGrid
+            images={result.images}
+            imageStatesMap={imageStates}
+            selectedIndex={selectedIdx}
+            onImageClick={handleImageClick}
+            onDiscard={(i) => setDiscardDialogIdx(i)}
+            onSave={(i) => { setSaveDialogIdx(i); setSaveName('') }}
+            onRefine={(i) => { setRefinementSource(i); setSelectedIdx(null) }}
+          />
 
-                  {isSelected && state === 'active' && (
-                    <div className="flex flex-col gap-1">
-                      <button type="button" onClick={() => setDiscardDialogIdx(i)}
-                        className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
-                        Verwerfen
-                      </button>
-                      <button type="button" onClick={() => { setSaveDialogIdx(i); setSaveName('') }}
-                        className="text-sm font-medium py-1.5 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">
-                        Speichern
-                      </button>
-                      <button type="button" onClick={() => { setRefinementSource(i); setSelectedIdx(null) }}
-                        className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
-                        Verfeinern
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          {/* Refinement history */}
+          {refinementHistory.map((record, rIdx) => (
+            <div key={rIdx} className="space-y-4 pt-4 border-t border-navy/10">
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-navy">Variante {record.sourceVariantIdx + 1} verfeinern</p>
+                <p className="text-sm text-navy/60">Anpassungen: {record.text}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 items-start">
+                {record.images.map((img, i) => (
+                  <div key={img.storagePath} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt={`Verfeinerung ${rIdx + 1}, Variante ${i + 1}`}
+                      className="w-full aspect-square object-cover rounded-lg border border-navy/10" />
+                    <button
+                      type="button"
+                      onClick={() => setZoomUrl(img.url)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
+                      aria-label="Vergrößern"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-7-4v8m-4-4h8" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
 
           {/* Refinement panel */}
           {refinementSource !== null && (
@@ -596,6 +682,21 @@ export default function ModelCreatePage() {
             className="border border-navy/30 text-navy/60 font-medium px-6 py-3 rounded-md hover:border-navy/60 hover:text-navy transition-colors">
             Reset
           </button>
+        </div>
+      )}
+
+      {/* Zoom modal */}
+      {zoomUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setZoomUrl(null)}>
+          <div className="relative max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setZoomUrl(null)}
+              className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
+              ×
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={zoomUrl} alt="Zoom" className="w-full rounded-xl object-contain max-h-[90vh]" />
+          </div>
         </div>
       )}
 
