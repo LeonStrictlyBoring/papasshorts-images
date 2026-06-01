@@ -44,6 +44,14 @@ export default function SettingsPage() {
   const [filterTo, setFilterTo] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [zoomSetting, setZoomSetting] = useState<Setting | null>(null)
+
+  useEffect(() => {
+    if (!zoomSetting) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomSetting(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomSetting])
 
   useEffect(() => {
     async function load() {
@@ -222,10 +230,11 @@ export default function SettingsPage() {
                       className="w-4 h-4 accent-orange" />
                   </td>
                   <td className="px-2 py-2">
-                    <div className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5 shrink-0">
+                    <button type="button" onClick={() => setZoomSetting(s)}
+                      className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5 shrink-0 hover:ring-2 hover:ring-orange transition-all block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
-                    </div>
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-navy">{s.name}</td>
                   <td className="px-4 py-3 text-sm text-navy/60 whitespace-nowrap">{formatDate(s.createdAt)}</td>
@@ -234,6 +243,40 @@ export default function SettingsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Zoom modal */}
+      {zoomSetting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setZoomSetting(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]"
+            onClick={e => e.stopPropagation()}>
+            <button type="button" onClick={() => setZoomSetting(null)}
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
+              ×
+            </button>
+
+            <div className="p-6 flex gap-6 h-full">
+              <div className="flex-1 min-w-0 h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={zoomSetting.imageUrl} alt={zoomSetting.name} className="w-full h-full rounded-lg object-contain object-left" />
+              </div>
+
+              <div className="w-80 shrink-0 flex flex-col justify-end gap-4">
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">Name</span>
+                    <p className="text-sm text-navy mt-0.5">{zoomSetting.name}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-navy/40">Erstellt</span>
+                    <p className="text-sm text-navy/60 mt-0.5">{formatDate(zoomSetting.createdAt)} von {zoomSetting.createdBy}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
