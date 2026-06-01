@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp, updateDoc } from 'firebase/firestore'
+import { ref, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '@/lib/firebase'
 
 async function downloadImage(url: string) {
   try {
@@ -23,6 +24,7 @@ async function downloadImage(url: string) {
 interface Shooting {
   id: string
   imageUrl: string
+  storagePath?: string
   models: string[]
   setting: string
   artikel: { produktname: string; artikelId: string }[]
@@ -210,7 +212,15 @@ export default function ShootingsPage() {
                     <button type="button" onClick={() => setZoomShooting(s)}
                       className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5 hover:ring-2 hover:ring-orange transition-all block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.imageUrl} alt="" className="w-full h-full object-cover" />
+                      <img src={s.imageUrl} alt="" className="w-full h-full object-cover"
+                        onError={async (e) => {
+                          if (!s.storagePath) return
+                          try {
+                            const fresh = await getDownloadURL(ref(storage, s.storagePath))
+                            e.currentTarget.src = fresh
+                            await updateDoc(doc(db, 'shootings', s.id), { imageUrl: fresh })
+                          } catch { /* silent */ }
+                        }} />
                     </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-navy">{(s.models || []).join(', ') || '–'}</td>

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { collection, query, orderBy, getDocs, addDoc, Timestamp } from 'firebase/firestore'
-import { functions, db } from '@/lib/firebase'
+import { ref, getDownloadURL } from 'firebase/storage'
+import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -289,8 +290,9 @@ export default function ShootingCreatePage() {
     if (!block) return
     const shot = block.shots[shotIdx]
     try {
+      const permanentUrl = await getDownloadURL(ref(storage, shot.storagePath))
       await addDoc(collection(db, 'shootings'), {
-        imageUrl: shot.url,
+        imageUrl: permanentUrl,
         storagePath: shot.storagePath,
         models: modelBlocks.filter(b => b.model).map(b => b.model!.name),
         setting: selectedSetting!.name,

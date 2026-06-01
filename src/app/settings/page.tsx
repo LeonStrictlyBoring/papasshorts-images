@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp, updateDoc } from 'firebase/firestore'
+import { ref, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '@/lib/firebase'
 
 interface Setting {
   id: string
   imageUrl: string
+  storagePath?: string
   name: string
   createdAt: Timestamp
   createdBy: string
@@ -233,7 +235,15 @@ export default function SettingsPage() {
                     <button type="button" onClick={() => setZoomSetting(s)}
                       className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 bg-navy/5 shrink-0 hover:ring-2 hover:ring-orange transition-all block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover" />
+                      <img src={s.imageUrl} alt={s.name} className="w-full h-full object-cover"
+                        onError={async (e) => {
+                          if (!s.storagePath) return
+                          try {
+                            const fresh = await getDownloadURL(ref(storage, s.storagePath))
+                            e.currentTarget.src = fresh
+                            await updateDoc(doc(db, 'settings', s.id), { imageUrl: fresh })
+                          } catch { /* silent */ }
+                        }} />
                     </button>
                   </td>
                   <td className="px-4 py-3 text-sm font-medium text-navy">{s.name}</td>

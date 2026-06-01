@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, Timestamp } from 'firebase/firestore'
-import { functions, db } from '@/lib/firebase'
+import { ref, getDownloadURL } from 'firebase/storage'
+import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
 
 type LocationType = 'indoor' | 'outdoor-urban' | 'outdoor-natur' | null
@@ -201,9 +202,10 @@ export default function SettingCreatePage() {
     if (!saveTarget || !saveName.trim()) return
     setSaving(true); setSaveError(null)
     try {
+      const permanentUrl = await getDownloadURL(ref(storage, saveTarget.storagePath))
       const briefing = JSON.parse(JSON.stringify(buildPayload()))
       await addDoc(collection(db, 'settings'), {
-        imageUrl: saveTarget.url,
+        imageUrl: permanentUrl,
         storagePath: saveTarget.storagePath,
         name: saveName.trim(),
         briefing,
