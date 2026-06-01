@@ -204,31 +204,39 @@ export const generateShootingShots = onCall({
     const generationId = crypto.randomUUID();
     const images: { url: string; storagePath: string }[] = [];
 
+    const MAX_RETRIES = 2;
+
     for (let i = 0; i < NUMBER_OF_SHOTS; i++) {
-      let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
-      try {
-        response = await ai.models.generateContent({
-          model: 'gemini-3-pro-image-preview',
-          contents,
-          config: { responseModalities: ['IMAGE'] },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.error('Gemini API Fehler', { message, errString: String(err) });
-        if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-          throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
+      let imagePart: { inlineData?: { data?: string; mimeType?: string } } | undefined;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents,
+            config: { responseModalities: ['IMAGE'] },
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.error('Gemini API Fehler', { message, attempt });
+          if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
+            throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
+          }
+          if (attempt === MAX_RETRIES) throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
+          continue;
         }
-        throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
+
+        const parts = response.candidates?.[0]?.content?.parts ?? [];
+        imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+        if (imagePart?.inlineData?.data) break;
+
+        const finishReason = response.candidates?.[0]?.finishReason;
+        const textContent = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 200);
+        logger.warn(`Shot ${i} Versuch ${attempt}: kein Bild`, { finishReason, textContent });
       }
 
-      const parts = response.candidates?.[0]?.content?.parts ?? [];
-      const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
-      if (!imagePart?.inlineData?.data) {
-        const finishReason = response.candidates?.[0]?.finishReason;
-        const textContent = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 300);
-        logger.warn(`Shot ${i}: kein Bild`, { finishReason, hasCandidates: !!response.candidates?.length, textContent });
-        continue;
-      }
+      if (!imagePart?.inlineData?.data) continue;
 
       const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
       const storagePath = `generated/shootings/${userId}/${timestamp}/${i}.jpg`;
