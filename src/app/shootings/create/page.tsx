@@ -235,6 +235,10 @@ export default function ShootingCreatePage() {
     try {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots')
       const res = await fn(payload)
+      if (!res.data.images?.length) {
+        setGenError('Kein Bild generiert. Bitte erneut versuchen.')
+        return
+      }
       const newBlock: ShotBlock = {
         id: Date.now().toString(),
         shots: res.data.images,

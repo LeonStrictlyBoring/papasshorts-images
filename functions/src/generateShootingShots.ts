@@ -123,7 +123,7 @@ export const generateShootingShots = onCall({
   serviceAccount: 'firebase-adminsdk-fbsvc@bildgenerierung-495412.iam.gserviceaccount.com',
   secrets: ['GEMINI_API_KEY'],
   timeoutSeconds: 540,
-  memory: '512MiB',
+  memory: '1GiB',
 }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Login erforderlich');
 
