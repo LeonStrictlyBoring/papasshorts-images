@@ -719,80 +719,88 @@ export default function ShootingCreatePage() {
 
       {/* ── Model Overlay ── */}
       {modelOverlayBlockId && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10">
-            <p className="font-semibold text-navy">Model auswählen</p>
-            <button type="button" onClick={() => setModelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg">×</button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            {poolModelsLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
-            <div className="space-y-3 max-w-2xl mx-auto">
-              {poolModels.map(m => (
-                <button key={m.id} type="button" onClick={() => setModelOverlaySelected(m.id)}
-                  className={`w-full flex items-center gap-4 p-3 rounded-xl border-2 transition-colors text-left ${modelOverlaySelected === m.id ? 'border-orange bg-orange/5' : 'border-navy/10 hover:border-navy/30'}`}>
-                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-navy/10 shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-navy">{m.name}</p>
-                    {m.sedcard?.appearance?.phenotype && <p className="text-xs text-navy/50">{m.sedcard.appearance.phenotype}{m.sedcard.appearance.build ? ` · ${m.sedcard.appearance.build}` : ''}</p>}
-                    {m.sedcard?.archetypes?.[0] && <p className="text-xs text-navy/40">{m.sedcard.archetypes[0].split(' (')[0]}</p>}
-                  </div>
-                </button>
-              ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setModelOverlayBlockId(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10 shrink-0">
+              <p className="font-semibold text-navy">Model auswählen</p>
+              <button type="button" onClick={() => setModelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg leading-none">×</button>
             </div>
-          </div>
-          <div className="px-6 py-4 border-t border-navy/10 flex gap-3 max-w-2xl mx-auto w-full">
-            <button type="button" onClick={confirmModelSelection} disabled={!modelOverlaySelected}
-              className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-40">Auswählen</button>
-            <button type="button" onClick={() => setModelOverlayBlockId(null)}
-              className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
+            <div className="flex-1 overflow-y-auto p-6">
+              {poolModelsLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
+              <div className="space-y-3">
+                {poolModels.map(m => (
+                  <button key={m.id} type="button" onClick={() => setModelOverlaySelected(m.id)}
+                    className={`w-full flex items-center gap-4 p-3 rounded-xl border-2 transition-colors text-left ${modelOverlaySelected === m.id ? 'border-orange bg-orange/5' : 'border-navy/10 hover:border-navy/30'}`}>
+                    <div className="w-16 h-16 rounded-lg overflow-hidden border border-navy/10 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.imageUrl} alt={m.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-navy">{m.name}</p>
+                      {m.sedcard?.appearance?.phenotype && <p className="text-xs text-navy/50">{m.sedcard.appearance.phenotype}{m.sedcard.appearance.build ? ` · ${m.sedcard.appearance.build}` : ''}</p>}
+                      {m.sedcard?.archetypes?.[0] && <p className="text-xs text-navy/40">{m.sedcard.archetypes[0].split(' (')[0]}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-navy/10 flex gap-3 shrink-0">
+              <button type="button" onClick={confirmModelSelection} disabled={!modelOverlaySelected}
+                className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-40">Auswählen</button>
+              <button type="button" onClick={() => setModelOverlayBlockId(null)}
+                className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ── Artikel Overlay ── */}
       {artikelOverlayBlockId && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10">
-            <p className="font-semibold text-navy">Artikel zuordnen</p>
-            <button type="button" onClick={() => setArtikelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg">×</button>
-          </div>
-          <div className="px-6 py-3 border-b border-navy/5">
-            <select value={artikelFilterKat} onChange={e => setArtikelFilterKat(e.target.value)}
-              className="border border-navy/20 rounded-md px-3 py-2 text-sm text-navy focus:outline-none focus:border-orange">
-              <option value="">Alle Kategorien</option>
-              {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            {poolArtikelLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
-            <div className="space-y-2 max-w-2xl mx-auto">
-              {filteredArtikel.map(a => (
-                <label key={a.id} className={`flex items-center gap-4 p-3 rounded-xl border-2 cursor-pointer transition-colors ${artikelOverlaySelected.has(a.id) ? 'border-orange bg-orange/5' : 'border-navy/10 hover:border-navy/30'}`}>
-                  <input type="checkbox" checked={artikelOverlaySelected.has(a.id)}
-                    onChange={() => setArtikelOverlaySelected(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n })}
-                    className="w-4 h-4 accent-orange shrink-0" />
-                  <div className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-navy">{a.produktname}</p>
-                    <p className="text-xs text-navy/50 font-mono">{a.artikelId} · {a.kategorie}</p>
-                  </div>
-                </label>
-              ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setArtikelOverlayBlockId(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10 shrink-0">
+              <p className="font-semibold text-navy">Artikel zuordnen</p>
+              <button type="button" onClick={() => setArtikelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg leading-none">×</button>
             </div>
-          </div>
-          <div className="px-6 py-4 border-t border-navy/10 flex gap-3 max-w-2xl mx-auto w-full">
-            <button type="button" onClick={confirmArtikelSelection}
-              className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors">
-              {artikelOverlaySelected.size > 0 ? `${artikelOverlaySelected.size} Artikel übernehmen` : 'Übernehmen'}
-            </button>
-            <button type="button" onClick={() => setArtikelOverlayBlockId(null)}
-              className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
+            <div className="px-6 py-3 border-b border-navy/5 shrink-0">
+              <select value={artikelFilterKat} onChange={e => setArtikelFilterKat(e.target.value)}
+                className="border border-navy/20 rounded-md px-3 py-2 text-sm text-navy focus:outline-none focus:border-orange">
+                <option value="">Alle Kategorien</option>
+                {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {poolArtikelLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
+              <div className="space-y-2">
+                {filteredArtikel.map(a => (
+                  <label key={a.id} className={`flex items-center gap-4 p-3 rounded-xl border-2 cursor-pointer transition-colors ${artikelOverlaySelected.has(a.id) ? 'border-orange bg-orange/5' : 'border-navy/10 hover:border-navy/30'}`}>
+                    <input type="checkbox" checked={artikelOverlaySelected.has(a.id)}
+                      onChange={() => setArtikelOverlaySelected(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n })}
+                      className="w-4 h-4 accent-orange shrink-0" />
+                    <div className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-navy">{a.produktname}</p>
+                      <p className="text-xs text-navy/50 font-mono">{a.artikelId} · {a.kategorie}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-navy/10 flex gap-3 shrink-0">
+              <button type="button" onClick={confirmArtikelSelection}
+                className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors">
+                {artikelOverlaySelected.size > 0 ? `${artikelOverlaySelected.size} Artikel übernehmen` : 'Übernehmen'}
+              </button>
+              <button type="button" onClick={() => setArtikelOverlayBlockId(null)}
+                className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
+            </div>
           </div>
         </div>
       )}
