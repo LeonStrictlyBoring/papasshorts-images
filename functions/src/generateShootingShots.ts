@@ -5,6 +5,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
 import { checkRateLimit } from './rateLimit';
+import sharp from 'sharp';
 
 interface ModelInput {
   name: string;
@@ -107,10 +108,14 @@ function buildAssignmentText(
 
 async function loadImage(storagePath: string): Promise<{ data: string; mimeType: string }> {
   const file = getStorage().bucket().file(storagePath);
-  const [[buf], [meta]] = await Promise.all([file.download(), file.getMetadata()]);
+  const [[buf]] = await Promise.all([file.download()]);
+  const resized = await sharp(buf)
+    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer();
   return {
-    data: buf.toString('base64'),
-    mimeType: (meta.contentType as string) || 'image/jpeg',
+    data: resized.toString('base64'),
+    mimeType: 'image/jpeg',
   };
 }
 
