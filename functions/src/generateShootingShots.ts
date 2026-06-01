@@ -49,7 +49,7 @@ interface GenerateShootingShotsRequest {
   refinement?: { storagePath: string; text: string };
 }
 
-const NUMBER_OF_SHOTS = 2;
+const NUMBER_OF_SHOTS = 1;
 const na = 'Keine Angabe';
 
 function buildPrompt(
