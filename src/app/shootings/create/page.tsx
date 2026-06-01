@@ -31,8 +31,17 @@ interface ModelBlock {
 }
 interface Shot { url: string; storagePath: string }
 interface ShotBlock {
-  id: string; shots: Shot[]; savedIndices: Set<number>
-  selectedIdx: number | null; refinementText: string; refining: boolean; refineError: string | null
+  id: string
+  shots: Shot[]
+  savedIndices: Set<number>
+  discardedIndices: Set<number>
+  selectedIdx: number | null
+  showRefinementInput: boolean
+  refinementText: string
+  refining: boolean
+  refineError: string | null
+  refinedFrom?: string
+  refinedWithText?: string
 }
 interface GenerationResult { images: { url: string; storagePath: string }[]; generationId: string }
 
@@ -75,6 +84,7 @@ export default function ShootingCreatePage() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [shotBlocks, setShotBlocks] = useState<ShotBlock[]>([])
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null)
 
   // Model overlay
   const [modelOverlayBlockId, setModelOverlayBlockId] = useState<string | null>(null)
@@ -94,6 +104,13 @@ export default function ShootingCreatePage() {
   const [poolSettings, setPoolSettings] = useState<PoolSetting[]>([])
   const [poolSettingsLoading, setPoolSettingsLoading] = useState(false)
   const [settingOverlaySelected, setSettingOverlaySelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!zoomUrl) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomUrl(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoomUrl])
 
   // Load pool data when overlays open
   useEffect(() => {
@@ -209,7 +226,9 @@ export default function ShootingCreatePage() {
         id: Date.now().toString(),
         shots: res.data.images,
         savedIndices: new Set(),
+        discardedIndices: new Set(),
         selectedIdx: null,
+        showRefinementInput: false,
         refinementText: '',
         refining: false,
         refineError: null,
@@ -247,12 +266,16 @@ export default function ShootingCreatePage() {
         id: Date.now().toString(),
         shots: res.data.images,
         savedIndices: new Set(),
+        discardedIndices: new Set(),
         selectedIdx: null,
+        showRefinementInput: false,
         refinementText: '',
         refining: false,
         refineError: null,
+        refinedFrom: 'Auswahl verfeinern',
+        refinedWithText: block.refinementText.trim(),
       }
-      setShotBlocks(prev => [...prev.map(b => b.id === blockId ? { ...b, refining: false } : b), newBlock])
+      setShotBlocks(prev => [...prev.map(b => b.id === blockId ? { ...b, refining: false, selectedIdx: null, showRefinementInput: false, refinementText: '' } : b), newBlock])
       setTimeout(() => streamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100)
     } catch (err: unknown) {
       setShotBlocks(prev => prev.map(b => b.id === blockId
@@ -543,53 +566,81 @@ export default function ShootingCreatePage() {
         <div className="space-y-8 border-t border-navy/10 pt-8" ref={streamRef}>
           {shotBlocks.map((block, blockIdx) => (
             <div key={block.id} className="space-y-4">
-              <p className="text-xs font-semibold text-navy/40 uppercase tracking-wide">
-                {blockIdx === 0 ? 'Generierung 1' : `Generierung ${blockIdx + 1}`}
-              </p>
+              {/* Header */}
+              {block.refinedFrom ? (
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-navy">{block.refinedFrom}</p>
+                  <p className="text-sm text-navy/60">Anpassungen: {block.refinedWithText}</p>
+                </div>
+              ) : (
+                <p className="text-xs font-semibold text-navy/40 uppercase tracking-wide">
+                  {blockIdx === 0 ? 'Generierung 1' : `Generierung ${blockIdx + 1}`}
+                </p>
+              )}
 
               {/* Shot grid */}
-              <div className="grid grid-cols-3 gap-3">
-                {block.shots.map((shot, i) => (
-                  <div key={shot.storagePath} className="flex flex-col gap-1">
-                    <button type="button"
-                      onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id
-                        ? { ...b, selectedIdx: b.selectedIdx === i ? null : i } : b))}
-                      disabled={block.savedIndices.has(i)}
-                      className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
-                        block.selectedIdx === i ? 'border-orange' : block.savedIndices.has(i) ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange'
-                      }`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={shot.url} alt={`Shot ${i + 1}`} className="w-full h-full object-cover" />
-                      {block.savedIndices.has(i) && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              <div className="grid grid-cols-3 gap-4 items-start">
+                {block.shots.map((shot, i) => {
+                  if (block.discardedIndices.has(i)) return null
+                  const isSaved = block.savedIndices.has(i)
+                  const isSelected = block.selectedIdx === i
+                  return (
+                    <div key={shot.storagePath} className="flex flex-col gap-2">
+                      <div className="relative">
+                        <button type="button"
+                          onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id
+                            ? { ...b, selectedIdx: b.selectedIdx === i ? null : i, showRefinementInput: false } : b))}
+                          disabled={isSaved}
+                          className={`relative w-full aspect-square overflow-hidden rounded-lg border-2 transition-colors ${
+                            isSelected ? 'border-orange' : isSaved ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange'
+                          }`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={shot.url} alt={`Shot ${i + 1}`} className="w-full h-full object-cover" />
+                          {isSaved && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                        {/* Zoom icon */}
+                        <button type="button" onClick={() => setZoomUrl(shot.url)}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors z-10"
+                          aria-label="Vergrößern">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-7-4v8m-4-4h8" />
                           </svg>
+                        </button>
+                      </div>
+                      {isSelected && !isSaved && (
+                        <div className="flex flex-col gap-1">
+                          <button type="button"
+                            onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id
+                              ? { ...b, discardedIndices: new Set([...b.discardedIndices, i]), selectedIdx: null } : b))}
+                            className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
+                            Verwerfen
+                          </button>
+                          <button type="button" onClick={() => handleSaveShot(block.id, i)}
+                            className="text-sm font-medium py-1.5 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">
+                            Speichern
+                          </button>
+                          <button type="button"
+                            onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id ? { ...b, showRefinementInput: true } : b))}
+                            className="text-sm font-medium py-1.5 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
+                            Verfeinern
+                          </button>
                         </div>
                       )}
-                    </button>
-                    {!block.savedIndices.has(i) && (
-                      <button type="button" onClick={() => handleSaveShot(block.id, i)}
-                        className="text-xs font-medium py-1 rounded border border-orange/40 bg-orange/5 text-orange hover:bg-orange/15 transition-colors">
-                        Speichern
-                      </button>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
 
-              {/* Action bar */}
-              <div className="flex gap-3 flex-wrap">
-                <button type="button" onClick={handleVerwerfenNeu} disabled={generating}
-                  className="text-sm font-medium px-4 py-2 rounded border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors disabled:opacity-40">
-                  Verwerfen &amp; neu
-                </button>
-              </div>
-
-              {/* Refinement */}
-              {block.selectedIdx !== null && (
+              {/* Refinement input */}
+              {block.selectedIdx !== null && block.showRefinementInput && (
                 <div className="space-y-3 border border-navy/10 rounded-xl p-4 bg-navy/[0.02]">
-                  <p className="text-sm text-navy/50">Shot {block.selectedIdx + 1} verfeinern</p>
+                  <p className="text-sm text-navy/50">Auswahl verfeinern</p>
                   <textarea rows={3} value={block.refinementText}
                     onChange={e => setShotBlocks(prev => prev.map(b => b.id === block.id ? { ...b, refinementText: e.target.value } : b))}
                     placeholder="Beschreibe die gewünschten Anpassungen …"
@@ -605,9 +656,10 @@ export default function ShootingCreatePage() {
                     <button type="button" onClick={() => handleRefine(block.id)}
                       disabled={block.refining || !block.refinementText.trim()}
                       className="bg-orange text-white font-semibold px-5 py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-50 text-sm">
-                      {block.refining ? 'Wird verfeinert …' : 'Refine'}
+                      {block.refining ? 'Wird verfeinert …' : 'Verfeinern'}
                     </button>
-                    <button type="button" onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id ? { ...b, selectedIdx: null, refinementText: '' } : b))}
+                    <button type="button"
+                      onClick={() => setShotBlocks(prev => prev.map(b => b.id === block.id ? { ...b, showRefinementInput: false, refinementText: '' } : b))}
                       disabled={block.refining}
                       className="text-sm px-5 py-2 rounded-md border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
                       Abbrechen
@@ -625,6 +677,20 @@ export default function ShootingCreatePage() {
         <div className="flex flex-col items-center gap-3 text-navy/60 py-8">
           <div className="w-8 h-8 border-2 border-orange border-t-transparent rounded-full animate-spin" />
           <p className="text-sm">Shots werden generiert …</p>
+        </div>
+      )}
+
+      {/* ── Zoom Modal ── */}
+      {zoomUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setZoomUrl(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]" onClick={e => e.stopPropagation()}>
+            <button type="button" onClick={() => setZoomUrl(null)}
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">×</button>
+            <div className="p-6 h-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={zoomUrl} alt="Zoom" className="w-full h-full rounded-lg object-contain object-left" />
+            </div>
+          </div>
         </div>
       )}
 
