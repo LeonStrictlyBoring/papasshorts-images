@@ -139,7 +139,7 @@ export default function ModelCreatePage() {
     if (err) { setError(err); return }
     setError(null); setLoading(true)
     try {
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages', { timeout: 540000 })
       const response = await fn(buildRequestPayload())
       setResult(response.data); setSubmitted(true)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -236,7 +236,7 @@ export default function ModelCreatePage() {
     if (!refinementSource || !refinementText.trim()) return
     setRefining(true); setRefineError(null)
     try {
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages', { timeout: 540000 })
       const response = await fn(buildRequestPayload({ storagePath: refinementSource.storagePath, text: refinementText.trim() }))
       setRefinementHistory(prev => [...prev, {
         sourceLabel: refinementSource.label,

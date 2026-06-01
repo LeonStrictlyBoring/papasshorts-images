@@ -136,7 +136,7 @@ export default function SettingCreatePage() {
     if (!locationType) { setError('Bitte wähle einen Location-Typ aus.'); return }
     setError(null); setLoading(true)
     try {
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages', { timeout: 540000 })
       const response = await fn(buildPayload())
       setResult(response.data); setSubmitted(true)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -236,7 +236,7 @@ export default function SettingCreatePage() {
     if (!refinementSource || !refinementText.trim()) return
     setRefining(true); setRefineError(null)
     try {
-      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages')
+      const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages', { timeout: 540000 })
       const response = await fn(buildPayload({ storagePath: refinementSource.storagePath, text: refinementText.trim() }))
       setRefinementHistory(prev => [...prev, {
         sourceLabel: refinementSource.label,
