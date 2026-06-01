@@ -16,7 +16,8 @@ interface PoolModel {
 }
 interface PoolArtikel {
   id: string; produktname: string; artikelId: string
-  imageUrl: string; storagePath: string; kategorie: string; archived?: boolean
+  imageUrl: string; storagePath: string; kategorie: string
+  createdAt: Timestamp; createdBy: string; archived?: boolean
 }
 interface PoolSetting {
   id: string; name: string; imageUrl: string; storagePath: string
@@ -100,6 +101,11 @@ export default function ShootingCreatePage() {
   const [poolArtikelLoading, setPoolArtikelLoading] = useState(false)
   const [artikelOverlaySelected, setArtikelOverlaySelected] = useState<Set<string>>(new Set())
   const [artikelFilterKat, setArtikelFilterKat] = useState('')
+  const [artikelFilterCreator, setArtikelFilterCreator] = useState('')
+  const [artikelFilterFrom, setArtikelFilterFrom] = useState('')
+  const [artikelFilterTo, setArtikelFilterTo] = useState('')
+  const [artikelSortKey, setArtikelSortKey] = useState<'produktname' | 'artikelId' | 'kategorie' | 'createdAt' | 'createdBy'>('createdAt')
+  const [artikelSortDir, setArtikelSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Setting overlay
   const [settingOverlayOpen, setSettingOverlayOpen] = useState(false)
@@ -308,9 +314,22 @@ export default function ShootingCreatePage() {
     } catch { /* silent */ }
   }
 
-  const filteredArtikel = artikelFilterKat
-    ? poolArtikel.filter(a => a.kategorie === artikelFilterKat)
-    : poolArtikel
+  const filteredArtikel = (() => {
+    let list = poolArtikel
+    if (artikelFilterKat) list = list.filter(a => a.kategorie === artikelFilterKat)
+    if (artikelFilterCreator) list = list.filter(a => a.createdBy === artikelFilterCreator)
+    if (artikelFilterFrom) { const f = new Date(artikelFilterFrom); list = list.filter(a => a.createdAt?.toDate() >= f) }
+    if (artikelFilterTo) { const t = new Date(artikelFilterTo); t.setHours(23,59,59,999); list = list.filter(a => a.createdAt?.toDate() <= t) }
+    return [...list].sort((a, b) => {
+      let cmp = 0
+      if (artikelSortKey === 'produktname') cmp = a.produktname.localeCompare(b.produktname)
+      else if (artikelSortKey === 'artikelId') cmp = a.artikelId.localeCompare(b.artikelId)
+      else if (artikelSortKey === 'kategorie') cmp = a.kategorie.localeCompare(b.kategorie)
+      else if (artikelSortKey === 'createdAt') cmp = (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0)
+      else cmp = a.createdBy.localeCompare(b.createdBy)
+      return artikelSortDir === 'asc' ? cmp : -cmp
+    })
+  })()
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -757,53 +776,125 @@ export default function ShootingCreatePage() {
       )}
 
       {/* ── Artikel Overlay ── */}
-      {artikelOverlayBlockId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setArtikelOverlayBlockId(null)}>
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] flex flex-col"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10 shrink-0">
-              <p className="font-semibold text-navy">Artikel zuordnen</p>
-              <button type="button" onClick={() => setArtikelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg leading-none">×</button>
-            </div>
-            <div className="px-6 py-3 border-b border-navy/5 shrink-0">
-              <select value={artikelFilterKat} onChange={e => setArtikelFilterKat(e.target.value)}
-                className="border border-navy/20 rounded-md px-3 py-2 text-sm text-navy focus:outline-none focus:border-orange">
-                <option value="">Alle Kategorien</option>
-                {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6">
-              {poolArtikelLoading && <div className="flex items-center gap-2 text-navy/50"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
-              <div className="space-y-2">
-                {filteredArtikel.map(a => (
-                  <label key={a.id} className={`flex items-center gap-4 p-3 rounded-xl border-2 cursor-pointer transition-colors ${artikelOverlaySelected.has(a.id) ? 'border-orange bg-orange/5' : 'border-navy/10 hover:border-navy/30'}`}>
-                    <input type="checkbox" checked={artikelOverlaySelected.has(a.id)}
-                      onChange={() => setArtikelOverlaySelected(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n })}
-                      className="w-4 h-4 accent-orange shrink-0" />
-                    <div className="w-12 h-12 rounded-md overflow-hidden border border-navy/10 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-navy">{a.produktname}</p>
-                      <p className="text-xs text-navy/50 font-mono">{a.artikelId} · {a.kategorie}</p>
-                    </div>
-                  </label>
-                ))}
+      {artikelOverlayBlockId && (() => {
+        const creators = [...new Set(poolArtikel.map(a => a.createdBy))].sort()
+        const formatDate = (ts: Timestamp) => {
+          const d = ts.toDate(); const pad = (n: number) => String(n).padStart(2, '0')
+          return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
+        }
+        const SortBtn = ({ label, k }: { label: string; k: typeof artikelSortKey }) => (
+          <button type="button" onClick={() => {
+            if (artikelSortKey === k) setArtikelSortDir(d => d === 'asc' ? 'desc' : 'asc')
+            else { setArtikelSortKey(k); setArtikelSortDir('asc') }
+          }} className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors ${artikelSortKey === k ? 'text-orange' : 'text-navy/50 hover:text-navy'}`}>
+            {label}<span className="text-[10px]">{artikelSortKey === k ? (artikelSortDir === 'asc' ? '↑' : '↓') : '↕'}</span>
+          </button>
+        )
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => setArtikelOverlayBlockId(null)}>
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10 shrink-0">
+                <p className="font-semibold text-navy">Artikel zuordnen</p>
+                <button type="button" onClick={() => setArtikelOverlayBlockId(null)} className="text-navy/50 hover:text-navy text-lg leading-none">×</button>
+              </div>
+              {/* Filter bar */}
+              <div className="px-6 py-3 border-b border-navy/5 shrink-0 flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-navy/50">Kategorie</span>
+                  <select value={artikelFilterKat} onChange={e => setArtikelFilterKat(e.target.value)}
+                    className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange">
+                    <option value="">Alle</option>
+                    {KATEGORIEN.map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-navy/50">Ersteller</span>
+                  <select value={artikelFilterCreator} onChange={e => setArtikelFilterCreator(e.target.value)}
+                    className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange">
+                    <option value="">Alle</option>
+                    {creators.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-navy/50">Von</span>
+                  <input type="date" value={artikelFilterFrom} onChange={e => setArtikelFilterFrom(e.target.value)}
+                    className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-navy/50">Bis</span>
+                  <input type="date" value={artikelFilterTo} onChange={e => setArtikelFilterTo(e.target.value)}
+                    className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange" />
+                </div>
+                {(artikelFilterKat || artikelFilterCreator || artikelFilterFrom || artikelFilterTo) && (
+                  <button type="button" onClick={() => { setArtikelFilterKat(''); setArtikelFilterCreator(''); setArtikelFilterFrom(''); setArtikelFilterTo('') }}
+                    className="text-sm text-navy/50 hover:text-navy transition-colors pb-1">Filter zurücksetzen</button>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {poolArtikelLoading && <div className="flex items-center gap-2 text-navy/50 p-6"><div className="w-4 h-4 border-2 border-orange border-t-transparent rounded-full animate-spin" /><span className="text-sm">Wird geladen …</span></div>}
+                {!poolArtikelLoading && (
+                  <table className="w-full">
+                    <thead className="bg-navy/5 border-b border-navy/10 sticky top-0">
+                      <tr>
+                        <th className="w-10 px-4 py-3">
+                          <input type="checkbox"
+                            checked={filteredArtikel.length > 0 && filteredArtikel.every(a => artikelOverlaySelected.has(a.id))}
+                            onChange={() => {
+                              const allSelected = filteredArtikel.every(a => artikelOverlaySelected.has(a.id))
+                              setArtikelOverlaySelected(prev => {
+                                const n = new Set(prev)
+                                filteredArtikel.forEach(a => allSelected ? n.delete(a.id) : n.add(a.id))
+                                return n
+                              })
+                            }}
+                            className="w-4 h-4 accent-orange" />
+                        </th>
+                        <th className="w-14 px-2 py-3" />
+                        <th className="px-4 py-3 text-left"><SortBtn label="Produktname" k="produktname" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="ID" k="artikelId" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="Kategorie" k="kategorie" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="Erstellt" k="createdAt" /></th>
+                        <th className="px-4 py-3 text-left"><SortBtn label="Ersteller" k="createdBy" /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy/5">
+                      {filteredArtikel.map(a => (
+                        <tr key={a.id} onClick={() => setArtikelOverlaySelected(prev => { const n = new Set(prev); n.has(a.id) ? n.delete(a.id) : n.add(a.id); return n })}
+                          className={`cursor-pointer transition-colors ${artikelOverlaySelected.has(a.id) ? 'bg-orange/5' : 'hover:bg-navy/[0.02]'}`}>
+                          <td className="px-4 py-3">
+                            <input type="checkbox" checked={artikelOverlaySelected.has(a.id)} readOnly className="w-4 h-4 accent-orange pointer-events-none" />
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="w-10 h-10 rounded-md overflow-hidden border border-navy/10 bg-navy/5 shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-navy">{a.produktname}</td>
+                          <td className="px-4 py-3 text-sm text-navy/70 font-mono">{a.artikelId}</td>
+                          <td className="px-4 py-3 text-sm text-navy/70">{a.kategorie}</td>
+                          <td className="px-4 py-3 text-sm text-navy/60 whitespace-nowrap">{a.createdAt ? formatDate(a.createdAt) : '–'}</td>
+                          <td className="px-4 py-3 text-sm text-navy/60">{a.createdBy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t border-navy/10 flex gap-3 shrink-0">
+                <button type="button" onClick={confirmArtikelSelection}
+                  className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors">
+                  {artikelOverlaySelected.size > 0 ? `${artikelOverlaySelected.size} Artikel übernehmen` : 'Übernehmen'}
+                </button>
+                <button type="button" onClick={() => setArtikelOverlayBlockId(null)}
+                  className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-navy/10 flex gap-3 shrink-0">
-              <button type="button" onClick={confirmArtikelSelection}
-                className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors">
-                {artikelOverlaySelected.size > 0 ? `${artikelOverlaySelected.size} Artikel übernehmen` : 'Übernehmen'}
-              </button>
-              <button type="button" onClick={() => setArtikelOverlayBlockId(null)}
-                className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
-            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Setting Overlay ── */}
       {settingOverlayOpen && (
