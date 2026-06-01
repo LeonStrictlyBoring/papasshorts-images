@@ -50,7 +50,7 @@ interface GenerateShootingShotsRequest {
   refinement?: { storagePath: string; text: string };
 }
 
-const NUMBER_OF_SHOTS = 2;
+const NUMBER_OF_SHOTS = 3;
 const na = 'Keine Angabe';
 
 function buildPrompt(
@@ -202,35 +202,31 @@ export const generateShootingShots = onCall({
 
     const contents = { role: 'user', parts };
 
-    // Generate shots in parallel
-    let responses: Awaited<ReturnType<typeof ai.models.generateContent>>[];
-    try {
-      responses = await Promise.all(
-        Array.from({ length: NUMBER_OF_SHOTS }, () =>
-          ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
-            contents,
-            config: { responseModalities: ['IMAGE'] },
-          })
-        )
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error('Gemini API Fehler', { message, errString: String(err) });
-      if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-        throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
-      }
-      throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
-    }
-
+    // Generate shots sequentially
     const bucket = getStorage().bucket();
     const userId = request.auth.uid;
     const timestamp = Date.now();
     const generationId = crypto.randomUUID();
     const images: { url: string; storagePath: string }[] = [];
 
-    for (let i = 0; i < responses.length; i++) {
-      const imagePart = (responses[i].candidates?.[0]?.content?.parts ?? [])
+    for (let i = 0; i < NUMBER_OF_SHOTS; i++) {
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview',
+          contents,
+          config: { responseModalities: ['IMAGE'] },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error('Gemini API Fehler', { message, errString: String(err) });
+        if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
+          throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
+        }
+        throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
+      }
+
+      const imagePart = (response.candidates?.[0]?.content?.parts ?? [])
         .find(p => p.inlineData?.mimeType?.startsWith('image/'));
       if (!imagePart?.inlineData?.data) continue;
 
