@@ -5,7 +5,6 @@ import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
 import { checkRateLimit } from './rateLimit';
-import sharp from 'sharp';
 
 interface ModelInput {
   name: string;
@@ -108,14 +107,10 @@ function buildAssignmentText(
 
 async function loadImage(storagePath: string): Promise<{ data: string; mimeType: string }> {
   const file = getStorage().bucket().file(storagePath);
-  const [[buf]] = await Promise.all([file.download()]);
-  const resized = await sharp(buf)
-    .resize(512, 512, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: 80 })
-    .toBuffer();
+  const [[buf], [meta]] = await Promise.all([file.download(), file.getMetadata()]);
   return {
-    data: resized.toString('base64'),
-    mimeType: 'image/jpeg',
+    data: buf.toString('base64'),
+    mimeType: (meta.contentType as string) || 'image/jpeg',
   };
 }
 
@@ -226,9 +221,14 @@ export const generateShootingShots = onCall({
         throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
       }
 
-      const imagePart = (response.candidates?.[0]?.content?.parts ?? [])
-        .find(p => p.inlineData?.mimeType?.startsWith('image/'));
-      if (!imagePart?.inlineData?.data) continue;
+      const parts = response.candidates?.[0]?.content?.parts ?? [];
+      const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+      if (!imagePart?.inlineData?.data) {
+        const finishReason = response.candidates?.[0]?.finishReason;
+        const textContent = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 300);
+        logger.warn(`Shot ${i}: kein Bild`, { finishReason, hasCandidates: !!response.candidates?.length, textContent });
+        continue;
+      }
 
       const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
       const storagePath = `generated/shootings/${userId}/${timestamp}/${i}.jpg`;
