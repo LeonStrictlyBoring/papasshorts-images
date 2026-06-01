@@ -556,8 +556,12 @@ export default function ShootingCreatePage() {
 
       {/* ── Error ── */}
       {genError && (
-        <div className="p-4 border border-red-300 bg-red-50 rounded-lg">
+        <div className="p-4 border border-red-300 bg-red-50 rounded-lg space-y-3">
           <p className="text-sm text-red-700">{genError}</p>
+          <button type="button" onClick={handleVerwerfenNeu} disabled={generating}
+            className="text-sm font-medium text-orange hover:text-orange/80 transition-colors disabled:opacity-50">
+            Erneut versuchen
+          </button>
         </div>
       )}
 
