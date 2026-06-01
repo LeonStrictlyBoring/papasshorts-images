@@ -799,10 +799,13 @@ export default function ShootingCreatePage() {
 
       {/* ── Setting Overlay ── */}
       {settingOverlayOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setSettingOverlayOpen(false)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-navy/10 shrink-0">
             <p className="font-semibold text-navy">Setting auswählen</p>
-            <button type="button" onClick={() => setSettingOverlayOpen(false)} className="text-navy/50 hover:text-navy text-lg">×</button>
+            <button type="button" onClick={() => setSettingOverlayOpen(false)} className="text-navy/50 hover:text-navy text-lg leading-none">×</button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {poolSettingsLoading && (
@@ -865,11 +868,12 @@ export default function ShootingCreatePage() {
               )
             })()}
           </div>
-          <div className="px-6 py-4 border-t border-navy/10 flex gap-3">
+          <div className="px-6 py-4 border-t border-navy/10 flex gap-3 shrink-0">
             <button type="button" onClick={confirmSettingSelection} disabled={!settingOverlaySelected}
               className="flex-1 bg-orange text-white font-semibold py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-40">Auswählen</button>
             <button type="button" onClick={() => setSettingOverlayOpen(false)}
               className="flex-1 border border-navy/20 text-navy font-medium py-2 rounded-md hover:border-navy/40 transition-colors">Abbrechen</button>
+          </div>
           </div>
         </div>
       )}
