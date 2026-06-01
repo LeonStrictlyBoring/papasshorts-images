@@ -114,6 +114,9 @@ export default function ShootingCreatePage() {
   const [settingOverlaySelected, setSettingOverlaySelected] = useState<string | null>(null)
   const [settingSortKey, setSettingSortKey] = useState<'name' | 'createdAt' | 'createdBy'>('createdAt')
   const [settingSortDir, setSettingSortDir] = useState<'asc' | 'desc'>('desc')
+  const [settingFilterCreator, setSettingFilterCreator] = useState('')
+  const [settingFilterFrom, setSettingFilterFrom] = useState('')
+  const [settingFilterTo, setSettingFilterTo] = useState('')
 
   useEffect(() => {
     if (!zoomUrl) return
@@ -914,7 +917,12 @@ export default function ShootingCreatePage() {
               </div>
             )}
             {!poolSettingsLoading && poolSettings.length > 0 && (() => {
-              const sorted = [...poolSettings].sort((a, b) => {
+              const creators = [...new Set(poolSettings.map(s => s.createdBy))].sort()
+              let list = poolSettings
+              if (settingFilterCreator) list = list.filter(s => s.createdBy === settingFilterCreator)
+              if (settingFilterFrom) { const f = new Date(settingFilterFrom); list = list.filter(s => s.createdAt?.toDate() >= f) }
+              if (settingFilterTo) { const t = new Date(settingFilterTo); t.setHours(23,59,59,999); list = list.filter(s => s.createdAt?.toDate() <= t) }
+              const sorted = [...list].sort((a, b) => {
                 let cmp = 0
                 if (settingSortKey === 'name') cmp = a.name.localeCompare(b.name)
                 else if (settingSortKey === 'createdAt') cmp = (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0)
@@ -936,6 +944,32 @@ export default function ShootingCreatePage() {
                 </button>
               )
               return (
+                <>
+                {/* Filter bar */}
+                <div className="px-6 py-3 border-b border-navy/5 flex flex-wrap gap-3 items-end">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-navy/50">Ersteller</span>
+                    <select value={settingFilterCreator} onChange={e => setSettingFilterCreator(e.target.value)}
+                      className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange">
+                      <option value="">Alle</option>
+                      {creators.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-navy/50">Von</span>
+                    <input type="date" value={settingFilterFrom} onChange={e => setSettingFilterFrom(e.target.value)}
+                      className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-navy/50">Bis</span>
+                    <input type="date" value={settingFilterTo} onChange={e => setSettingFilterTo(e.target.value)}
+                      className="border border-navy/20 rounded-md px-2 py-1.5 text-sm text-navy focus:outline-none focus:border-orange" />
+                  </div>
+                  {(settingFilterCreator || settingFilterFrom || settingFilterTo) && (
+                    <button type="button" onClick={() => { setSettingFilterCreator(''); setSettingFilterFrom(''); setSettingFilterTo('') }}
+                      className="text-sm text-navy/50 hover:text-navy transition-colors pb-1">Filter zurücksetzen</button>
+                  )}
+                </div>
                 <div className="border-navy/10 overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-navy/5 border-b border-navy/10">
@@ -964,6 +998,7 @@ export default function ShootingCreatePage() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )
             })()}
           </div>
