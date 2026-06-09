@@ -6,6 +6,7 @@ import { collection, addDoc, Timestamp } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
 import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
+import { formatFirebaseError, validationError, type FormattedError } from '@/lib/formatFirebaseError'
 
 type LocationType = 'indoor' | 'outdoor-urban' | 'outdoor-natur' | null
 type ImageState = 'active' | 'discarded' | 'saved'
@@ -72,7 +73,7 @@ export default function SettingCreatePage() {
   // Generation state
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<GenerationResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<FormattedError | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
   // Image interaction
@@ -132,8 +133,8 @@ export default function SettingCreatePage() {
   }
 
   async function handleSubmit() {
-    if (!beschreibung.trim()) { setError('Bitte beschreibe das gewünschte Setting.'); return }
-    if (!locationType) { setError('Bitte wähle einen Location-Typ aus.'); return }
+    if (!beschreibung.trim()) { setError(validationError('Bitte beschreibe das gewünschte Setting.')); return }
+    if (!locationType) { setError(validationError('Bitte wähle einen Location-Typ aus.')); return }
     setError(null); setLoading(true)
     try {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateSettingImages', { timeout: 540000 })
@@ -141,7 +142,7 @@ export default function SettingCreatePage() {
       setResult(response.data); setSubmitted(true)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setError(formatFirebaseError(err))
     } finally {
       setLoading(false)
     }
@@ -582,10 +583,19 @@ export default function SettingCreatePage() {
 
       {/* Error */}
       {error && !loading && (
-        <div className="mt-8 p-4 border border-red-300 bg-red-50 rounded-lg space-y-3">
-          <p className="text-sm text-red-700">{error}</p>
-          {!submitted && (
-            <button type="button" onClick={handleSubmit} className="text-sm font-medium text-orange hover:text-orange/80 transition-colors">Erneut versuchen</button>
+        <div className="mt-8 p-4 border border-red-300 bg-red-50 rounded-lg space-y-2">
+          {error.kind === 'api' ? (
+            <>
+              <p className="text-sm font-bold text-red-700">Es tut uns leid, ein Fehler ist aufgetreten.</p>
+              <p className="text-sm text-red-700">
+                {error.code && <span className="font-medium">{error.code} – </span>}
+                {error.explanation}
+              </p>
+              {error.action && <p className="text-sm text-red-700">{error.action}</p>}
+              <button type="button" onClick={handleSubmit} className="text-sm font-medium text-orange hover:text-orange/80 transition-colors">Erneut versuchen</button>
+            </>
+          ) : (
+            <p className="text-sm text-red-700">{error.explanation}</p>
           )}
         </div>
       )}

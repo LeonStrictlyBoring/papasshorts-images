@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp, updateDoc } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
@@ -36,6 +37,7 @@ function SortButton({ label, active, dir, onClick }: { label: string; active: bo
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [settings, setSettings] = useState<Setting[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -232,6 +234,7 @@ export default function SettingsPage() {
                 <th className="px-4 py-3 text-left">
                   <SortButton label="Ersteller" active={sortKey === 'createdBy'} dir={sortDir} onClick={() => toggleSort('createdBy')} />
                 </th>
+                <th className="w-12 px-2 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-navy/5">
@@ -260,6 +263,15 @@ export default function SettingsPage() {
                   <td className="px-4 py-3 text-sm font-medium text-navy">{s.name}</td>
                   <td className="px-4 py-3 text-sm text-navy/60 whitespace-nowrap">{formatDate(s.createdAt)}</td>
                   <td className="px-4 py-3 text-sm text-navy/60">{s.createdBy}</td>
+                  <td className="px-2 py-3">
+                    <button type="button" onClick={() => router.push(`/settings/${s.id}/edit`)}
+                      className="w-8 h-8 flex items-center justify-center rounded hover:bg-navy/10 transition-colors text-navy/40 hover:text-navy"
+                      title="Setting bearbeiten">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

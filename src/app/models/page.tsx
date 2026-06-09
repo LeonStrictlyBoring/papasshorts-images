@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -45,6 +46,7 @@ function formatDate(ts: Timestamp): string {
 }
 
 export default function ModelsPage() {
+  const router = useRouter()
   const [models, setModels] = useState<Model[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null)
@@ -121,7 +123,19 @@ export default function ModelsPage() {
                 </div>
 
                 <div className="p-4 flex flex-col gap-3 flex-1">
-                  <p className="font-bold text-navy">{model.name}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-bold text-navy">{model.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/models/${model.id}/edit`)}
+                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-navy/10 transition-colors text-navy/40 hover:text-navy shrink-0"
+                      title="Model bearbeiten"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
 
                   <div className="space-y-1.5 text-sm">
                     {model.sedcard?.bodyMeasurements?.height && (
@@ -147,18 +161,20 @@ export default function ModelsPage() {
                     )}
                   </div>
 
-                  <div className="mt-auto pt-2 border-t border-navy/5 flex items-end justify-between gap-2">
-                    <div className="space-y-0.5 text-xs text-navy/40">
-                      <p><span>Erstellt: </span>{formatDate(model.createdAt)}</p>
-                      <p><span>Von: </span>{model.createdBy}</p>
+                  <div className="mt-auto pt-2 border-t border-navy/5">
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="space-y-0.5 text-xs text-navy/40">
+                        <p><span>Erstellt: </span>{formatDate(model.createdAt)}</p>
+                        <p><span>Von: </span>{model.createdBy}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteDialogId(model.id)}
+                        className="text-xs text-navy/30 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        Löschen
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteDialogId(model.id)}
-                      className="text-xs text-navy/30 hover:text-red-500 transition-colors shrink-0"
-                    >
-                      Löschen
-                    </button>
                   </div>
                 </div>
               </div>

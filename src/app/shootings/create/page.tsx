@@ -6,6 +6,7 @@ import { collection, query, orderBy, getDocs, addDoc, Timestamp } from 'firebase
 import { ref, getDownloadURL } from 'firebase/storage'
 import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
+import { formatFirebaseError, type FormattedError } from '@/lib/formatFirebaseError'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -14,9 +15,10 @@ interface PoolModel {
   sedcard?: { appearance?: { phenotype?: string; build?: string }; archetypes?: string[] }
   archived?: boolean
 }
+interface ArtikelBild { url: string; storagePath: string; ansicht: string }
 interface PoolArtikel {
   id: string; produktname: string; artikelId: string
-  imageUrl: string; storagePath: string; kategorie: string
+  bilder: ArtikelBild[]; kategorie: string
   createdAt: Timestamp; createdBy: string; archived?: boolean
 }
 interface PoolSetting {
@@ -25,7 +27,7 @@ interface PoolSetting {
 }
 interface SelectedArtikel {
   id: string; produktname: string; artikelId: string
-  imageUrl: string; storagePath: string; kategorie: string
+  bilder: ArtikelBild[]; kategorie: string
 }
 interface ModelBlock {
   blockId: string
@@ -86,7 +88,7 @@ export default function ShootingCreatePage() {
   // Generation state
   const [submitted, setSubmitted] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState<string | null>(null)
+  const [genError, setGenError] = useState<FormattedError | null>(null)
   const [shotBlocks, setShotBlocks] = useState<ShotBlock[]>([])
   const [zoomUrl, setZoomUrl] = useState<string | null>(null)
 
@@ -163,6 +165,16 @@ export default function ShootingCreatePage() {
       ? { ...b, artikel: b.artikel.filter(a => a.id !== artikelId) } : b))
   }
 
+  function removeArtikelBild(blockId: string, artikelId: string, storagePath: string) {
+    setModelBlocks(prev => prev.map(b => b.blockId === blockId
+      ? {
+          ...b, artikel: b.artikel
+            .map(a => a.id === artikelId ? { ...a, bilder: a.bilder.filter(bild => bild.storagePath !== storagePath) } : a)
+            .filter(a => a.bilder.length > 0)
+        }
+      : b))
+  }
+
   function openModelOverlay(blockId: string) {
     const block = modelBlocks.find(b => b.blockId === blockId)
     setModelOverlaySelected(block?.model?.id ?? null)
@@ -188,7 +200,7 @@ export default function ShootingCreatePage() {
     if (!artikelOverlayBlockId) return
     const selected = poolArtikel.filter(a => artikelOverlaySelected.has(a.id))
     setModelBlocks(prev => prev.map(b => b.blockId === artikelOverlayBlockId
-      ? { ...b, artikel: selected.map(a => ({ id: a.id, produktname: a.produktname, artikelId: a.artikelId, imageUrl: a.imageUrl, storagePath: a.storagePath, kategorie: a.kategorie })) }
+      ? { ...b, artikel: selected.map(a => ({ id: a.id, produktname: a.produktname, artikelId: a.artikelId, bilder: a.bilder ?? [], kategorie: a.kategorie })) }
       : b))
     setArtikelOverlayBlockId(null)
   }
@@ -211,7 +223,11 @@ export default function ShootingCreatePage() {
       models: activeBlocks.map(b => ({ name: b.model!.name, storagePath: b.model!.storagePath })),
       modelArtikel: activeBlocks.map(b => ({
         modelName: b.model!.name,
-        artikel: b.artikel.map(a => ({ produktname: a.produktname, artikelId: a.artikelId, storagePath: a.storagePath })),
+        artikel: b.artikel.map(a => ({
+          produktname: a.produktname,
+          artikelId: a.artikelId,
+          bilder: a.bilder.map(bild => ({ storagePath: bild.storagePath, ansicht: bild.ansicht })),
+        })),
       })),
       setting: { name: selectedSetting!.name, storagePath: selectedSetting!.storagePath },
       regie: JSON.parse(JSON.stringify({
@@ -237,7 +253,7 @@ export default function ShootingCreatePage() {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateShootingShots', { timeout: 540000 })
       const res = await fn(payload)
       if (!res.data.images?.length) {
-        setGenError('Kein Bild generiert. Bitte erneut versuchen.')
+        setGenError({ kind: 'api', explanation: 'Es wurde kein Bild generiert.', action: 'Bitte versuche es erneut.' })
         setTimeout(() => errorRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         return
       }
@@ -255,7 +271,7 @@ export default function ShootingCreatePage() {
       setShotBlocks(prev => [...prev, newBlock])
       setTimeout(() => streamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100)
     } catch (err: unknown) {
-      setGenError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setGenError(formatFirebaseError(err))
       setTimeout(() => errorRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } finally {
       setGenerating(false)
@@ -363,18 +379,16 @@ export default function ShootingCreatePage() {
 
               {/* Model selection */}
               {block.model ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-navy/10 shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={block.model.imageUrl} alt={block.model.name} className="w-full h-full object-cover" />
+                <div className="inline-flex flex-col gap-1">
+                  <p className="text-xs font-medium text-navy">{block.model.name}</p>
+                  <div className="relative group w-28 h-28 shrink-0">
+                    <div className="w-28 h-28 rounded-lg overflow-hidden border border-navy/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={block.model.imageUrl} alt={block.model.name} className="w-full h-full object-cover" />
+                    </div>
+                    <button type="button" onClick={() => setModelBlocks(prev => prev.map(b => b.blockId === block.blockId ? { ...b, model: null } : b))}
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-navy/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500">×</button>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-navy">{block.model.name}</p>
-                  </div>
-                  <button type="button" onClick={() => openModelOverlay(block.blockId)}
-                    className="text-xs text-orange hover:text-orange/80 transition-colors">Ändern</button>
-                  <button type="button" onClick={() => setModelBlocks(prev => prev.map(b => b.blockId === block.blockId ? { ...b, model: null } : b))}
-                    className="text-xs text-navy/40 hover:text-navy transition-colors">×</button>
                 </div>
               ) : (
                 <button type="button" onClick={() => openModelOverlay(block.blockId)}
@@ -386,16 +400,24 @@ export default function ShootingCreatePage() {
               {/* Artikel */}
               <div className="space-y-2">
                 {block.artikel.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {block.artikel.map(a => (
-                      <div key={a.id} className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-md overflow-hidden border border-navy/10 shrink-0 bg-navy/5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                      <div key={a.id} className="space-y-1">
+                        <p className="text-xs font-medium text-navy">{a.produktname} <span className="text-navy/40 font-mono">{a.artikelId}</span></p>
+                        <p className="text-xs text-navy/40">Ansichten, die im Shooting nicht benötigt werden, bitte entfernen.</p>
+                        <div className="flex flex-wrap gap-2">
+                          {a.bilder.map(bild => (
+                            <div key={bild.storagePath} className="relative group">
+                              <div className="w-28 h-28 rounded-md overflow-hidden border border-navy/10 bg-navy/5">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={bild.url} alt={bild.ansicht} className="w-full h-full object-cover" />
+                              </div>
+                              <p className="text-[10px] text-navy/50 text-center mt-0.5 w-28 truncate">{bild.ansicht}</p>
+                              <button type="button" onClick={() => removeArtikelBild(block.blockId, a.id, bild.storagePath)}
+                                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-navy/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500">×</button>
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-sm text-navy flex-1">{a.produktname} <span className="text-navy/40 font-mono">{a.artikelId}</span></p>
-                        <button type="button" onClick={() => removeArtikelFromBlock(block.blockId, a.id)}
-                          className="text-navy/40 hover:text-navy transition-colors text-sm">×</button>
                       </div>
                     ))}
                   </div>
@@ -432,7 +454,7 @@ export default function ShootingCreatePage() {
                     <div key={a.id} className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-md overflow-hidden border border-navy/10 shrink-0 bg-navy/5">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                        <img src={a.bilder?.[0]?.url} alt={a.produktname} className="w-full h-full object-cover" />
                       </div>
                       <p className="text-sm text-navy">{a.produktname} <span className="text-navy/40 font-mono text-xs">{a.artikelId}</span></p>
                     </div>
@@ -604,8 +626,13 @@ export default function ShootingCreatePage() {
 
       {/* ── Error ── */}
       {genError && (
-        <div ref={errorRef} className="p-4 border border-red-300 bg-red-50 rounded-lg space-y-3">
-          <p className="text-sm text-red-700">{genError}</p>
+        <div ref={errorRef} className="p-4 border border-red-300 bg-red-50 rounded-lg space-y-2">
+          <p className="text-sm font-bold text-red-700">Es tut uns leid, ein Fehler ist aufgetreten.</p>
+          <p className="text-sm text-red-700">
+            {genError.kind === 'api' && genError.code && <span className="font-medium">{genError.code} – </span>}
+            {genError.explanation}
+          </p>
+          {genError.kind === 'api' && genError.action && <p className="text-sm text-red-700">{genError.action}</p>}
           <button type="button" onClick={handleVerwerfenNeu} disabled={generating}
             className="text-sm font-medium text-orange hover:text-orange/80 transition-colors disabled:opacity-50">
             Erneut versuchen
@@ -879,7 +906,7 @@ export default function ShootingCreatePage() {
                           <td className="px-2 py-2">
                             <div className="w-10 h-10 rounded-md overflow-hidden border border-navy/10 bg-navy/5 shrink-0">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={a.imageUrl} alt={a.produktname} className="w-full h-full object-cover" />
+                              <img src={a.bilder?.[0]?.url} alt={a.produktname} className="w-full h-full object-cover" />
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-navy">{a.produktname}</td>

@@ -108,16 +108,16 @@ export const generateModelImages = onCall({
   try {
     promptDoc = await getFirestore().collection('prompts').doc('model-creation').get();
   } catch (err) {
-    logger.error('Firestore-Fehler beim Lesen des System-Prompts', { errString: String(err) });
-    throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts');
+    logger.error('Firestore-Fehler beim Lesen des System-Prompts', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts', { httpStatus: 500, source: 'Firestore' });
   }
   if (!promptDoc.exists) {
-    throw new HttpsError('not-found', 'System-Prompt "model-creation" nicht in Firestore gefunden');
+    throw new HttpsError('not-found', 'System-Prompt "model-creation" nicht in Firestore gefunden', { httpStatus: 404, source: 'Firestore' });
   }
 
   const systemPrompt = (promptDoc.data() as { systemPrompt: string }).systemPrompt;
   if (!systemPrompt) {
-    throw new HttpsError('not-found', 'System-Prompt "model-creation" ist leer');
+    throw new HttpsError('not-found', 'System-Prompt "model-creation" ist leer', { httpStatus: 404, source: 'Firestore' });
   }
 
   const finalPrompt = buildPrompt(systemPrompt, data);
@@ -138,8 +138,8 @@ export const generateModelImages = onCall({
         ],
       };
     } catch (err) {
-      logger.error('Storage-Fehler beim Laden des Referenzbildes', { errString: String(err) });
-      throw new HttpsError('internal', 'Referenzbild konnte nicht geladen werden');
+      logger.error('Storage-Fehler beim Laden des Referenzbildes', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+      throw new HttpsError('internal', 'Referenzbild konnte nicht geladen werden', { httpStatus: 500, source: 'Storage' });
     }
   }
 
@@ -156,11 +156,14 @@ export const generateModelImages = onCall({
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error('Gemini API Fehler (raw)', { message, errString: String(err) });
+    logger.error('Gemini API Fehler', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message, errString: String(err) });
     if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-      throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
+      throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
     }
-    throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen');
+    if (message.includes('UNAVAILABLE') || message.includes('high demand')) {
+      throw new HttpsError('unavailable', 'Gemini API vorübergehend nicht erreichbar', { httpStatus: 503, source: 'Gemini' });
+    }
+    throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen', { httpStatus: 500, source: 'Gemini' });
   }
 
   const bucket = getStorage().bucket();

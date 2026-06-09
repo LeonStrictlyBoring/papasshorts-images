@@ -11,10 +11,15 @@ interface ModelInput {
   storagePath: string;
 }
 
+interface ArtikelBildInput {
+  storagePath: string;
+  ansicht: string;
+}
+
 interface ArtikelInput {
   produktname: string;
   artikelId: string;
-  storagePath: string;
+  bilder: ArtikelBildInput[];
 }
 
 interface ModelArtikelInput {
@@ -97,7 +102,12 @@ function buildAssignmentText(
   for (const ma of modelArtikel) {
     const modelIdx = indexMap[`model:${ma.modelName}`];
     const artikelList = ma.artikel
-      .map(a => `'${a.produktname}' (ID: ${a.artikelId}, Referenzbild ${indexMap[`artikel:${a.artikelId}`]})`)
+      .map(a => {
+        const bildRefs = a.bilder
+          .map((b, i) => `${b.ansicht || 'Ansicht'} (Referenzbild ${indexMap[`artikel:${a.artikelId}:${i}`]})`)
+          .join(', ');
+        return `'${a.produktname}' (ID: ${a.artikelId}, ${bildRefs})`;
+      })
       .join(', ');
     lines.push(`Model '${ma.modelName}' (Referenzbild ${modelIdx}) trägt: ${artikelList}.`);
   }
@@ -138,17 +148,19 @@ export const generateShootingShots = onCall({
   try {
     promptDoc = await getFirestore().collection('prompts').doc('shooting-creation').get();
   } catch (err) {
-    logger.error('Firestore-Fehler beim Lesen des System-Prompts', { errString: String(err) });
-    throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts');
+    logger.error('Firestore-Fehler beim Lesen des System-Prompts', { flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts', { httpStatus: 500, source: 'Firestore' });
   }
-  if (!promptDoc.exists) throw new HttpsError('not-found', 'System-Prompt "shooting-creation" nicht in Firestore gefunden');
+  if (!promptDoc.exists) throw new HttpsError('not-found', 'System-Prompt "shooting-creation" nicht in Firestore gefunden', { httpStatus: 404, source: 'Firestore' });
   const systemPrompt = (promptDoc.data() as { systemPrompt: string }).systemPrompt;
-  if (!systemPrompt) throw new HttpsError('not-found', 'System-Prompt "shooting-creation" ist leer');
+  if (!systemPrompt) throw new HttpsError('not-found', 'System-Prompt "shooting-creation" ist leer', { httpStatus: 404, source: 'Firestore' });
 
   // Load all reference images in parallel
   try {
     const modelPaths = data.models.map(m => m.storagePath);
-    const artikelPaths = data.modelArtikel.flatMap(ma => ma.artikel.map(a => a.storagePath));
+    const artikelPaths = data.modelArtikel.flatMap(ma =>
+      ma.artikel.flatMap(a => a.bilder.map(b => b.storagePath))
+    );
     const allPaths = [...modelPaths, ...artikelPaths, data.setting.storagePath];
 
     const loadedImages = await Promise.all(allPaths.map(loadImage));
@@ -167,10 +179,12 @@ export const generateShootingShots = onCall({
 
     for (const ma of data.modelArtikel) {
       for (const a of ma.artikel) {
-        const pathIdx = modelPaths.length + artikelPaths.indexOf(a.storagePath);
-        const img = loadedImages[pathIdx];
-        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-        indexMap[`artikel:${a.artikelId}`] = idx++;
+        for (let bi = 0; bi < a.bilder.length; bi++) {
+          const pathIdx = modelPaths.length + artikelPaths.indexOf(a.bilder[bi].storagePath);
+          const img = loadedImages[pathIdx];
+          parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+          indexMap[`artikel:${a.artikelId}:${bi}`] = idx++;
+        }
       }
     }
 
@@ -219,11 +233,14 @@ export const generateShootingShots = onCall({
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          logger.error('Gemini API Fehler', { message, attempt });
+          logger.error('Gemini API Fehler', { flow: 'shooting', userId: request.auth.uid, shot: i, attempt, errorType: err instanceof Error ? err.constructor.name : typeof err, message, errString: String(err) });
           if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-            throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten');
+            throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
           }
-          if (attempt === MAX_RETRIES) throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen');
+          if (message.includes('UNAVAILABLE') || message.includes('high demand')) {
+            throw new HttpsError('unavailable', 'Gemini API vorübergehend nicht erreichbar', { httpStatus: 503, source: 'Gemini' });
+          }
+          if (attempt === MAX_RETRIES) throw new HttpsError('internal', 'Shot-Generierung fehlgeschlagen', { httpStatus: 500, source: 'Gemini' });
           continue;
         }
 
@@ -233,10 +250,13 @@ export const generateShootingShots = onCall({
 
         const finishReason = response.candidates?.[0]?.finishReason;
         const textContent = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 200);
-        logger.warn(`Shot ${i} Versuch ${attempt}: kein Bild`, { finishReason, textContent });
+        logger.warn(`Shot ${i} Versuch ${attempt}: kein Bild`, { flow: 'shooting', userId: request.auth.uid, shot: i, attempt, finishReason, textContent });
       }
 
-      if (!imagePart?.inlineData?.data) continue;
+      if (!imagePart?.inlineData?.data) {
+        logger.error(`Shot ${i}: kein Bild nach allen Versuchen (stiller Fehler)`, { flow: 'shooting', userId: request.auth.uid, shot: i, maxRetries: MAX_RETRIES });
+        continue;
+      }
 
       const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
       const storagePath = `generated/shootings/${userId}/${timestamp}/${i}.jpg`;
@@ -255,7 +275,7 @@ export const generateShootingShots = onCall({
 
   } catch (err) {
     if (err instanceof HttpsError) throw err;
-    logger.error('Unerwarteter Fehler in generateShootingShots', { errString: String(err) });
-    throw new HttpsError('internal', 'Unerwarteter Fehler bei der Shot-Generierung');
+    logger.error('Unerwarteter Fehler in generateShootingShots', { flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    throw new HttpsError('internal', 'Unerwarteter Fehler bei der Shot-Generierung', { httpStatus: 500, source: 'Unbekannt' });
   }
 });

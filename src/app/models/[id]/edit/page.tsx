@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { use, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { httpsCallable } from 'firebase/functions'
-import { collection, addDoc, Timestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
 import { functions, db, storage } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
 import { formatFirebaseError, validationError, type FormattedError } from '@/lib/formatFirebaseError'
-import { ModelSedcardForm, emptySedcard, type SedcardValues } from '@/app/_components/ModelSedcardForm'
+import { ModelSedcardForm, emptySedcard, inputCls, type SedcardValues } from '@/app/_components/ModelSedcardForm'
 
 interface GeneratedImage { url: string; storagePath: string }
 interface GenerationResult { images: GeneratedImage[]; promptUsed: string; generationId: string }
@@ -24,13 +26,35 @@ interface RefinementRecord {
 interface SaveTarget { storagePath: string; rIdx?: number; imgIdx: number }
 interface DiscardTarget { rIdx?: number; imgIdx: number }
 
-export default function ModelCreatePage() {
+interface OriginalModel {
+  id: string
+  name: string
+  imageUrl: string
+  storagePath: string
+  sedcard: {
+    persona?: string
+    bodyMeasurements?: { height?: string; clothingSize?: string; shoeSize?: string; chest?: string; waist?: string; hips?: string }
+    appearance?: { build?: string; phenotype?: string; eyeColor?: string; skinTone?: string; skinUndertone?: string; hairColor?: string; hairTexture?: string; hairLength?: string; beard?: string; specialFeatures?: string }
+    archetypes?: string[]
+    customArchetype?: string | null
+  }
+}
+
+export default function ModelEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: modelId } = use(params)
+  const router = useRouter()
+  const { userDoc } = useAuth()
+
+  const [model, setModel] = useState<OriginalModel | null>(null)
+  const [modelLoading, setModelLoading] = useState(true)
+  const [modelError, setModelError] = useState<string | null>(null)
+
   const [sedcard, setSedcard] = useState<SedcardValues>(emptySedcard())
+  const [refinementText, setRefinementText] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<GenerationResult | null>(null)
   const [error, setError] = useState<FormattedError | null>(null)
-  const [submitted, setSubmitted] = useState(false)
 
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [imageStates, setImageStates] = useState<Record<number, ImageState>>({})
@@ -42,15 +66,53 @@ export default function ModelCreatePage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [discardTarget, setDiscardTarget] = useState<DiscardTarget | null>(null)
 
-  const [refinementSource, setRefinementSource] = useState<{ storagePath: string; label: string } | null>(null)
-  const [refinementText, setRefinementText] = useState('')
+  const [refineSource, setRefineSource] = useState<{ storagePath: string; label: string } | null>(null)
+  const [refineText, setRefineText] = useState('')
   const [refining, setRefining] = useState(false)
   const [refineError, setRefineError] = useState<string | null>(null)
 
   const [zoomUrl, setZoomUrl] = useState<string | null>(null)
 
   const resultsRef = useRef<HTMLDivElement>(null)
-  const { userDoc } = useAuth()
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const snap = await getDoc(doc(db, 'models', modelId))
+        if (!snap.exists()) { setModelError('Model nicht gefunden.'); return }
+        const data = snap.data()
+        const m = { ...data, id: snap.id } as OriginalModel
+        setModel(m)
+        const s = m.sedcard
+        setSedcard({
+          persona: s.persona ?? '',
+          height: s.bodyMeasurements?.height ?? '',
+          clothingSize: s.bodyMeasurements?.clothingSize ?? '',
+          shoeSize: s.bodyMeasurements?.shoeSize ?? '',
+          chest: s.bodyMeasurements?.chest ?? '',
+          waist: s.bodyMeasurements?.waist ?? '',
+          hips: s.bodyMeasurements?.hips ?? '',
+          build: s.appearance?.build ?? '',
+          phenotype: s.appearance?.phenotype ?? '',
+          eyeColor: s.appearance?.eyeColor ?? '',
+          skinTone: s.appearance?.skinTone ?? '',
+          skinUndertone: s.appearance?.skinUndertone ?? '',
+          hairColor: s.appearance?.hairColor ?? '',
+          hairTexture: s.appearance?.hairTexture ?? '',
+          hairLength: s.appearance?.hairLength ?? '',
+          beard: s.appearance?.beard ?? '',
+          specialFeatures: s.appearance?.specialFeatures ?? '',
+          selectedArchetypes: new Set(s.archetypes ?? []),
+          customArchetypeText: s.customArchetype ?? '',
+        })
+      } catch {
+        setModelError('Fehler beim Laden des Models.')
+      } finally {
+        setModelLoading(false)
+      }
+    }
+    load()
+  }, [modelId])
 
   useEffect(() => {
     if (!zoomUrl) return
@@ -71,14 +133,7 @@ export default function ModelCreatePage() {
     })
   }
 
-  function validate(): string | null {
-    if (!sedcard.persona.trim()) return 'Bitte beschreibe die Persona.'
-    if (sedcard.selectedArchetypes.size === 0 && !sedcard.customArchetypeText.trim())
-      return 'Bitte wähle mindestens einen Archetypen oder trage einen eigenen ein.'
-    return null
-  }
-
-  function buildRequestPayload(refinement?: { storagePath: string; text: string }) {
+  function buildPayload(refinement: { storagePath: string; text: string }) {
     const archetypes = Array.from(sedcard.selectedArchetypes).map(l => l.split(' (')[0])
     const customArchetype = sedcard.customArchetypeText.trim() || undefined
     return {
@@ -105,38 +160,33 @@ export default function ModelCreatePage() {
       },
       archetypes,
       ...(customArchetype && { customArchetype }),
-      ...(refinement && { refinement }),
+      refinement,
     }
   }
 
-  async function handleSubmit() {
-    const err = validate()
-    if (err) { setError(validationError(err)); return }
+  async function handleGenerate() {
+    if (!model) return
+    if (!sedcard.persona.trim()) { setError(validationError('Bitte beschreibe die Persona.')); return }
+    if (sedcard.selectedArchetypes.size === 0 && !sedcard.customArchetypeText.trim()) {
+      setError(validationError('Bitte wähle mindestens einen Archetypen.')); return
+    }
+    if (!refinementText.trim()) { setError(validationError('Bitte beschreibe, was geändert oder verbessert werden soll.')); return }
     setError(null); setLoading(true)
     try {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages', { timeout: 540000 })
-      const response = await fn(buildRequestPayload())
-      setResult(response.data); setSubmitted(true)
+      const response = await fn(buildPayload({ storagePath: model.storagePath, text: refinementText.trim() }))
+      setResult(response.data)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } catch (e: unknown) {
       setError(formatFirebaseError(e))
     } finally { setLoading(false) }
   }
 
-  function handleReset() {
-    setSedcard(emptySedcard())
-    setSubmitted(false); setResult(null); setSelectedIdx(null); setImageStates({})
-    setError(null); setSaveTarget(null); setSaveName(''); setDiscardTarget(null)
-    setRefinementSource(null); setRefinementText(''); setRefineError(null)
-    setRefinementHistory([]); setZoomUrl(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
   function handleImageClick(i: number) {
     const state = imageStates[i] ?? 'active'
     if (state === 'discarded' || state === 'saved') return
     setSelectedIdx(prev => prev === i ? null : i)
-    setRefinementSource(null); setRefinementText('')
+    setRefineSource(null); setRefineText('')
   }
 
   function handleRefinementImageClick(rIdx: number, i: number) {
@@ -146,7 +196,7 @@ export default function ModelCreatePage() {
       ri === rIdx ? { ...r, selectedIdx: r.selectedIdx === i ? null : i } : { ...r, selectedIdx: null }
     ))
     setSelectedIdx(null)
-    setRefinementSource(null); setRefinementText('')
+    setRefineSource(null); setRefineText('')
   }
 
   function confirmDiscard() {
@@ -184,6 +234,7 @@ export default function ModelCreatePage() {
         },
         createdAt: Timestamp.now(),
         createdBy: userDoc?.name ?? 'Unbekannt',
+        editedFrom: model?.id ?? null,
       })
       if (saveTarget.rIdx !== undefined) {
         const rIdx = saveTarget.rIdx
@@ -204,19 +255,19 @@ export default function ModelCreatePage() {
   }
 
   async function handleRefine() {
-    if (!refinementSource || !refinementText.trim()) return
+    if (!refineSource || !refineText.trim()) return
     setRefining(true); setRefineError(null)
     try {
       const fn = httpsCallable<unknown, GenerationResult>(functions, 'generateModelImages', { timeout: 540000 })
-      const response = await fn(buildRequestPayload({ storagePath: refinementSource.storagePath, text: refinementText.trim() }))
+      const response = await fn(buildPayload({ storagePath: refineSource.storagePath, text: refineText.trim() }))
       setRefinementHistory(prev => [...prev, {
-        sourceLabel: refinementSource.label,
-        text: refinementText.trim(),
+        sourceLabel: refineSource.label,
+        text: refineText.trim(),
         images: response.data.images,
         imageStates: {},
         selectedIdx: null,
       }])
-      setRefinementSource(null); setRefinementText(''); setSelectedIdx(null)
+      setRefineSource(null); setRefineText(''); setSelectedIdx(null)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     } catch (e: unknown) {
       setRefineError(e instanceof Error ? e.message : 'Unbekannter Fehler')
@@ -254,59 +305,67 @@ export default function ModelCreatePage() {
     )
   }
 
+  if (modelLoading) {
+    return (
+      <div className="flex items-center gap-3 text-navy/60 mt-8">
+        <div className="w-5 h-5 border-2 border-orange border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm">Model wird geladen …</span>
+      </div>
+    )
+  }
+
+  if (modelError || !model) {
+    return (
+      <div className="mt-8 space-y-4">
+        <p className="text-sm text-red-600">{modelError ?? 'Model nicht gefunden.'}</p>
+        <Link href="/models" className="text-sm text-orange hover:text-orange/80">← Zurück zu Models</Link>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl">
-      <h1 className="text-3xl font-bold text-navy mb-8">Model erstellen</h1>
+      <h1 className="text-3xl font-bold text-navy mb-2">Model bearbeiten</h1>
+      <p className="text-sm text-navy/50 mb-8">Originalmodell: <span className="font-medium text-navy">{model.name}</span> · Das Original bleibt gespeichert.</p>
 
-      {!submitted && (
-        <ModelSedcardForm
-          values={sedcard}
-          onChange={handleSedcardChange}
-          onToggleArchetype={handleToggleArchetype}
-          disabled={loading}
-          onSubmit={handleSubmit}
-          submitLabel={loading ? 'Wird erstellt …' : 'Models erstellen'}
-        />
-      )}
-
-      {submitted && (
-        <div className="space-y-8 bg-navy/5 rounded-xl p-6">
-          <section className="space-y-2">
-            <h3 className="text-base font-bold text-navy uppercase tracking-wide">Persona</h3>
-            <p className="text-sm text-navy whitespace-pre-wrap">{sedcard.persona || '–'}</p>
-          </section>
-          {(sedcard.height || sedcard.build || sedcard.clothingSize || sedcard.shoeSize || sedcard.chest || sedcard.waist || sedcard.hips) && (
-            <section className="space-y-3">
-              <h3 className="text-base font-bold text-navy uppercase tracking-wide">Körpermaße &amp; Steckbrief</h3>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                {([['Körpergröße', sedcard.height ? `${sedcard.height} cm` : ''], ['Statur / Körpertyp', sedcard.build], ['Konfektionsgröße', sedcard.clothingSize], ['Schuhgröße', sedcard.shoeSize], ['Brustumfang', sedcard.chest ? `${sedcard.chest} cm` : ''], ['Taillenumfang', sedcard.waist ? `${sedcard.waist} cm` : ''], ['Hüftumfang', sedcard.hips ? `${sedcard.hips} cm` : '']] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label}><p className="text-xs text-navy/50">{label}</p><p className="text-sm text-navy">{value}</p></div>
-                ))}
-              </div>
-            </section>
-          )}
-          {(sedcard.phenotype || sedcard.eyeColor || sedcard.skinTone || sedcard.skinUndertone || sedcard.hairColor || sedcard.hairTexture || sedcard.hairLength || sedcard.beard || sedcard.specialFeatures) && (
-            <section className="space-y-3">
-              <h3 className="text-base font-bold text-navy uppercase tracking-wide">Optische Merkmale</h3>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                {([['Phänotyp', sedcard.phenotype], ['Augenfarbe', sedcard.eyeColor], ['Hautton', sedcard.skinTone], ['Haut-Unterton', sedcard.skinUndertone], ['Haarfarbe', sedcard.hairColor], ['Haarstruktur', sedcard.hairTexture], ['Haarlänge', sedcard.hairLength], ['Bart', sedcard.beard]] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label}><p className="text-xs text-navy/50">{label}</p><p className="text-sm text-navy">{value}</p></div>
-                ))}
-                {sedcard.specialFeatures && <div className="col-span-2"><p className="text-xs text-navy/50">Besondere Merkmale</p><p className="text-sm text-navy">{sedcard.specialFeatures}</p></div>}
-              </div>
-            </section>
-          )}
-          <section className="space-y-2">
-            <h3 className="text-base font-bold text-navy uppercase tracking-wide">Model-Typ &amp; Archetyp</h3>
-            <p className="text-sm text-navy">{[...Array.from(sedcard.selectedArchetypes), sedcard.customArchetypeText.trim()].filter(Boolean).join(', ') || '–'}</p>
-          </section>
+      {/* Original model image */}
+      <div className="mb-10 flex gap-6 items-start p-5 bg-navy/[0.03] rounded-xl border border-navy/10">
+        <div className="w-32 h-32 rounded-lg overflow-hidden shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={model.imageUrl} alt={model.name} className="w-full h-full object-cover" />
         </div>
-      )}
+        <div className="space-y-1 pt-1">
+          <p className="text-xs text-navy/50 uppercase tracking-wide">Originalmodell</p>
+          <p className="font-semibold text-navy">{model.name}</p>
+          <p className="text-xs text-navy/40 mt-2">Beschreibe unten, was geändert werden soll. Die neuen Varianten werden auf Basis dieses Bildes generiert.</p>
+        </div>
+      </div>
+
+      {/* Refinement input */}
+      <div className="mb-10 space-y-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-semibold text-navy">Was soll geändert werden?</span>
+          <textarea rows={4} value={refinementText} onChange={(e) => setRefinementText(e.target.value)}
+            placeholder="Beschreibe die gewünschten Änderungen, z. B. Haarfarbe, Styling, Ausdruck …"
+            className={`w-full ${inputCls} resize-y`} disabled={loading} />
+        </label>
+      </div>
+
+      {/* Sedcard */}
+      <ModelSedcardForm
+        values={sedcard}
+        onChange={handleSedcardChange}
+        onToggleArchetype={handleToggleArchetype}
+        disabled={loading}
+        onSubmit={handleGenerate}
+        submitLabel={loading ? 'Wird generiert …' : 'Neue Varianten generieren'}
+        onCancel={() => router.push('/models')}
+      />
 
       {loading && (
         <div className="mt-12 flex flex-col items-center gap-3 text-navy/60">
           <div className="w-8 h-8 border-2 border-orange border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm">Deine Models werden erstellt …</p>
+          <p className="text-sm">Neue Varianten werden generiert …</p>
         </div>
       )}
 
@@ -320,7 +379,7 @@ export default function ModelCreatePage() {
                 {error.explanation}
               </p>
               {error.action && <p className="text-sm text-red-700">{error.action}</p>}
-              <button type="button" onClick={handleSubmit} className="text-sm font-medium text-orange hover:text-orange/80 transition-colors">Erneut versuchen</button>
+              <button type="button" onClick={handleGenerate} className="text-sm font-medium text-orange hover:text-orange/80 transition-colors">Erneut versuchen</button>
             </>
           ) : (
             <p className="text-sm text-red-700">{error.explanation}</p>
@@ -331,8 +390,8 @@ export default function ModelCreatePage() {
       {result && !loading && (
         <div ref={resultsRef} className="mt-16 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold text-navy">Deine Model-Varianten</h2>
-            <p className="text-sm text-navy/60 mt-1">Klicke auf ein Bild, um es auszuwählen.</p>
+            <h2 className="text-2xl font-bold text-navy">Neue Varianten</h2>
+            <p className="text-sm text-navy/60 mt-1">Klicke auf ein Bild, um es auszuwählen. Gespeicherte Varianten werden als neues Model angelegt.</p>
           </div>
 
           <div className="grid grid-cols-3 gap-4 items-start">
@@ -345,9 +404,9 @@ export default function ModelCreatePage() {
                   <div className="relative">
                     <button type="button" disabled={state === 'saved'} onClick={() => handleImageClick(i)}
                       className={`relative w-full aspect-square overflow-hidden rounded-lg border-2 transition-colors ${isSelected ? 'border-orange' : state === 'saved' ? 'border-transparent cursor-default' : 'border-transparent hover:border-orange focus:outline-none focus:border-orange'}`}
-                      aria-label={`Model-Variante ${i + 1}`}>
+                      aria-label={`Variante ${i + 1}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt={`Model-Variante ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={img.url} alt={`Variante ${i + 1}`} className="w-full h-full object-cover" />
                       {state === 'saved' && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -362,7 +421,7 @@ export default function ModelCreatePage() {
                     <ActionButtons
                       onDiscard={() => setDiscardTarget({ imgIdx: i })}
                       onSave={() => { setSaveTarget({ storagePath: img.storagePath, imgIdx: i }); setSaveName('') }}
-                      onRefine={() => { setRefinementSource({ storagePath: img.storagePath, label: `Variante ${i + 1}` }); setSelectedIdx(null) }}
+                      onRefine={() => { setRefineSource({ storagePath: img.storagePath, label: `Variante ${i + 1}` }); setSelectedIdx(null) }}
                     />
                   )}
                 </div>
@@ -403,7 +462,7 @@ export default function ModelCreatePage() {
                         <ActionButtons
                           onDiscard={() => setDiscardTarget({ rIdx, imgIdx: i })}
                           onSave={() => { setSaveTarget({ storagePath: img.storagePath, rIdx, imgIdx: i }); setSaveName('') }}
-                          onRefine={() => { setRefinementSource({ storagePath: img.storagePath, label: `Verfeinerung ${rIdx + 1}, Variante ${i + 1}` }); setRefinementHistory(prev => prev.map((r, ri) => ri === rIdx ? { ...r, selectedIdx: null } : r)) }}
+                          onRefine={() => { setRefineSource({ storagePath: img.storagePath, label: `Verfeinerung ${rIdx + 1}, Variante ${i + 1}` }); setRefinementHistory(prev => prev.map((r, ri) => ri === rIdx ? { ...r, selectedIdx: null } : r)) }}
                         />
                       )}
                     </div>
@@ -413,13 +472,13 @@ export default function ModelCreatePage() {
             </div>
           ))}
 
-          {refinementSource !== null && (
+          {refineSource !== null && (
             <div className="space-y-4 border border-navy/10 rounded-xl p-5 bg-navy/[0.02]">
               <p className="text-sm text-navy/50">Auswahl verfeinern</p>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-navy">Anpassungen</span>
-                <textarea rows={4} value={refinementText} onChange={(e) => setRefinementText(e.target.value)}
-                  placeholder="Beschreibe, was du ändern möchtest …" className="w-full border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange resize-y" disabled={refining} />
+                <textarea rows={4} value={refineText} onChange={(e) => setRefineText(e.target.value)}
+                  placeholder="Beschreibe, was du ändern möchtest …" className={`w-full ${inputCls} resize-y`} disabled={refining} />
               </label>
               {refining && (
                 <div className="flex items-center gap-3 text-navy/60">
@@ -429,26 +488,17 @@ export default function ModelCreatePage() {
               )}
               {refineError && <p className="text-sm text-red-600">{refineError}</p>}
               <div className="flex gap-3">
-                <button type="button" onClick={handleRefine} disabled={refining || !refinementText.trim()}
+                <button type="button" onClick={handleRefine} disabled={refining || !refineText.trim()}
                   className="bg-orange text-white font-semibold px-5 py-2 rounded-md hover:bg-orange/90 transition-colors disabled:opacity-50">
                   {refining ? 'Wird verfeinert …' : 'Verfeinern'}
                 </button>
-                <button type="button" onClick={() => { setRefinementSource(null); setRefinementText('') }} disabled={refining}
+                <button type="button" onClick={() => { setRefineSource(null); setRefineText('') }} disabled={refining}
                   className="px-5 py-2 rounded-md border border-navy/20 text-navy/60 hover:border-navy/40 hover:text-navy transition-colors">
                   Abbrechen
                 </button>
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {submitted && (
-        <div className="mt-12 pb-8">
-          <button type="button" onClick={handleReset}
-            className="border border-navy/30 text-navy/60 font-medium px-6 py-3 rounded-md hover:border-navy/60 hover:text-navy transition-colors">
-            Reset
-          </button>
         </div>
       )}
 
@@ -485,10 +535,11 @@ export default function ModelCreatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl p-6 w-80 space-y-4 shadow-xl">
             <p className="font-semibold text-navy">Model speichern</p>
+            <p className="text-xs text-navy/50">Wird als neues Model gespeichert. Das Original bleibt erhalten.</p>
             <label className="flex flex-col gap-1">
               <span className="text-sm text-navy/70">Name</span>
               <input type="text" value={saveName} onChange={(e) => setSaveName(e.target.value)}
-                placeholder="z. B. Business-Typ, Casual …" className="border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange" autoFocus
+                placeholder="z. B. Business-Typ v2 …" className="border border-navy/20 rounded-md px-3 py-2 text-navy placeholder:text-navy/30 focus:outline-none focus:border-orange" autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter' && !saving && saveName.trim()) handleSave() }} />
             </label>
             {saveError && <p className="text-sm text-red-600">{saveError}</p>}
