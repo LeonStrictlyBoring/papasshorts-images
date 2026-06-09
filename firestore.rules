@@ -43,6 +43,12 @@ service cloud.firestore {
       allow read, write: if isDeveloper();
     }
 
+    // errorLogs collection: developer read only, write via Cloud Functions (Admin SDK)
+    match /errorLogs/{logId} {
+      allow read: if isDeveloper();
+      allow write: if false;
+    }
+
     // shootings collection
     match /shootings/{shootingId} {
       allow read: if isSignedIn();

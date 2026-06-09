@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
   { label: 'Profil', href: '/profil' },
   { label: 'Nutzerverwaltung', href: '/profil/nutzerverwaltung', indent: true, requiresAdmin: true },
   { label: 'Prompts', href: '/profil/prompts', indent: true, requiresDeveloper: true },
+  { label: 'Fehler-Log', href: '/profil/error-logs', indent: true, requiresDeveloper: true },
 ]
 
 export default function Sidebar() {

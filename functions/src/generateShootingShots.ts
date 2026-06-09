@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
+import { writeErrorLog } from './logToFirestore';
 import { checkRateLimit } from './rateLimit';
 
 interface ModelInput {
@@ -150,6 +151,7 @@ export const generateShootingShots = onCall({
     promptDoc = await getFirestore().collection('prompts').doc('shooting-creation').get();
   } catch (err) {
     logger.error('Firestore-Fehler beim Lesen des System-Prompts', { flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    await writeErrorLog({ flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Firestore-Fehler beim Lesen des System-Prompts', errString: String(err), severity: 'error' });
     throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts', { httpStatus: 500, source: 'Firestore' });
   }
   if (!promptDoc.exists) throw new HttpsError('not-found', 'System-Prompt "shooting-creation" nicht in Firestore gefunden', { httpStatus: 404, source: 'Firestore' });
@@ -235,6 +237,7 @@ export const generateShootingShots = onCall({
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           logger.error('Gemini API Fehler', { flow: 'shooting', userId: request.auth.uid, shot: i, attempt, errorType: err instanceof Error ? err.constructor.name : typeof err, message, errString: String(err) });
+          void writeErrorLog({ flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: `Gemini API Fehler Shot ${i} Versuch ${attempt}: ${message}`, errString: String(err), severity: 'error' });
           if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
             throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
           }
@@ -252,10 +255,12 @@ export const generateShootingShots = onCall({
         const finishReason = response.candidates?.[0]?.finishReason;
         const textContent = parts.filter(p => p.text).map(p => p.text).join(' ').slice(0, 200);
         logger.warn(`Shot ${i} Versuch ${attempt}: kein Bild`, { flow: 'shooting', userId: request.auth.uid, shot: i, attempt, finishReason, textContent });
+        void writeErrorLog({ flow: 'shooting', userId: request.auth.uid, errorType: 'NoImageReturned', message: `Shot ${i} Versuch ${attempt}: kein Bild (${finishReason ?? 'unknown'})`, errString: textContent ?? '', severity: 'warn' });
       }
 
       if (!imagePart?.inlineData?.data) {
         logger.error(`Shot ${i}: kein Bild nach allen Versuchen (stiller Fehler)`, { flow: 'shooting', userId: request.auth.uid, shot: i, maxRetries: MAX_RETRIES });
+        void writeErrorLog({ flow: 'shooting', userId: request.auth.uid, errorType: 'SilentFailure', message: `Shot ${i}: kein Bild nach ${MAX_RETRIES + 1} Versuchen`, errString: '', severity: 'error' });
         continue;
       }
 
@@ -277,6 +282,7 @@ export const generateShootingShots = onCall({
   } catch (err) {
     if (err instanceof HttpsError) throw err;
     logger.error('Unerwarteter Fehler in generateShootingShots', { flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    await writeErrorLog({ flow: 'shooting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Unerwarteter Fehler in generateShootingShots', errString: String(err), severity: 'error' });
     throw new HttpsError('internal', 'Unerwarteter Fehler bei der Shot-Generierung', { httpStatus: 500, source: 'Unbekannt' });
   }
 });

@@ -4,6 +4,7 @@ import { getStorage } from 'firebase-admin/storage';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { logger } from 'firebase-functions';
+import { writeErrorLog } from './logToFirestore';
 import { checkRateLimit } from './rateLimit';
 
 interface IndoorData {
@@ -112,6 +113,7 @@ export const generateSettingImages = onCall({
     promptDoc = await getFirestore().collection('prompts').doc('setting-creation').get();
   } catch (err) {
     logger.error('Firestore-Fehler beim Lesen des System-Prompts', { flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+    await writeErrorLog({ flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Firestore-Fehler beim Lesen des System-Prompts', errString: String(err), severity: 'error' });
     throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts', { httpStatus: 500, source: 'Firestore' });
   }
   if (!promptDoc.exists) {
@@ -142,6 +144,7 @@ export const generateSettingImages = onCall({
       };
     } catch (err) {
       logger.error('Storage-Fehler beim Laden des Referenzbildes', { flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
+      await writeErrorLog({ flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Storage-Fehler beim Laden des Referenzbildes', errString: String(err), severity: 'error' });
       throw new HttpsError('internal', 'Referenzbild konnte nicht geladen werden', { httpStatus: 500, source: 'Storage' });
     }
   }
@@ -160,6 +163,7 @@ export const generateSettingImages = onCall({
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Gemini API Fehler', { flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message, errString: String(err) });
+    await writeErrorLog({ flow: 'setting', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: `Gemini API Fehler: ${message}`, errString: String(err), severity: 'error' });
     if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
       throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
     }
