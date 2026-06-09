@@ -3,21 +3,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { collection, query, orderBy, getDocs, doc, writeBatch, Timestamp, updateDoc } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
 import { ref, getDownloadURL } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db, storage, functions } from '@/lib/firebase'
 
-async function downloadImage(url: string) {
+async function downloadImage(filename: string, storagePath: string): Promise<string | null> {
   try {
-    const res = await fetch(url)
-    const blob = await res.blob()
+    const fn = httpsCallable<{ storagePath: string }, { data: string }>(
+      functions, 'getSignedDownloadUrl'
+    )
+    const result = await fn({ storagePath })
+    const binary = atob(result.data.data)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    const blob = new Blob([bytes], { type: 'image/jpeg' })
     const blobUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = blobUrl
-    a.download = 'shooting.jpg'
+    a.download = filename
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(blobUrl)
+    return null
   } catch {
-    window.open(url, '_blank')
+    return 'Download fehlgeschlagen. Bitte versuche es erneut.'
   }
 }
 
@@ -64,10 +74,14 @@ export default function ShootingsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [zoomShooting, setZoomShooting] = useState<Shooting | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  function closeZoom() { setZoomShooting(null); setDownloadError(null); setDownloading(false) }
 
   useEffect(() => {
     if (!zoomShooting) return
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setZoomShooting(null) }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') closeZoom() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [zoomShooting])
@@ -240,10 +254,10 @@ export default function ShootingsPage() {
       {/* Zoom modal */}
       {zoomShooting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setZoomShooting(null)}>
+          onClick={() => closeZoom()}>
           <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-7xl h-[90vh]"
             onClick={e => e.stopPropagation()}>
-            <button type="button" onClick={() => setZoomShooting(null)}
+            <button type="button" onClick={() => closeZoom()}
               className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-lg leading-none">
               ×
             </button>
@@ -281,9 +295,28 @@ export default function ShootingsPage() {
                   </div>
                 </div>
 
-                <button type="button" onClick={() => downloadImage(zoomShooting.imageUrl)}
-                  className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors w-full justify-center">
-                  ↓ Bild herunterladen
+                {downloadError && <p className="text-xs text-red-600">{downloadError}</p>}
+                <button type="button" disabled={downloading} onClick={async () => {
+                  setDownloading(true); setDownloadError(null)
+                  try {
+                    const d = zoomShooting.createdAt.toDate()
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    const filename = `shooting-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.jpg`
+                    const storagePath = zoomShooting.storagePath ?? (() => {
+                      try {
+                        const match = new URL(zoomShooting.imageUrl).pathname.match(/\/o\/(.+)$/)
+                        return match ? decodeURIComponent(match[1]) : null
+                      } catch { return null }
+                    })()
+                    if (!storagePath) { setDownloadError('Kein Storage-Pfad verfügbar.'); return }
+                    const err = await downloadImage(filename, storagePath)
+                    if (err) setDownloadError(err)
+                  } finally {
+                    setDownloading(false)
+                  }
+                }}
+                  className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors w-full justify-center disabled:opacity-50">
+                  {downloading ? 'Wird heruntergeladen …' : '↓ Bild herunterladen'}
                 </button>
               </div>
             </div>

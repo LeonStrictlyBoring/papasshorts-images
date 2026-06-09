@@ -9,3 +9,4 @@ export { generateModelImages } from './generateModelImages';
 export { generateSettingImages } from './generateSettingImages';
 export { generateShootingShots } from './generateShootingShots';
 export { createUser, deleteUser } from './userManagement';
+export { getSignedDownloadUrl } from './getSignedDownloadUrl';
