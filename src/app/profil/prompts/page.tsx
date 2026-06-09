@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { db, auth } from '@/lib/firebase'
+import { db } from '@/lib/firebase'
+import { useAuth } from '@/lib/useAuth'
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
 
 type PromptId = 'model-creation' | 'setting-creation' | 'shooting-creation'
@@ -106,6 +107,7 @@ function formatDate(ts: Timestamp | null): string {
 }
 
 function PromptSection({ id, label, placeholders }: { id: PromptId; label: string; placeholders?: Placeholder[] }) {
+  const { userDoc } = useAuth()
   const [data, setData] = useState<PromptData | null>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -132,13 +134,13 @@ function PromptSection({ id, label, placeholders }: { id: PromptId; label: strin
 
   async function handleSave() {
     setSaving(true)
-    const userId = auth.currentUser?.uid ?? 'unbekannt'
+    const updatedBy = userDoc?.name ?? 'Unbekannt'
     await setDoc(doc(db, 'prompts', id), {
       systemPrompt: draft,
       updatedAt: serverTimestamp(),
-      updatedBy: userId,
+      updatedBy,
     })
-    setData({ systemPrompt: draft, updatedAt: Timestamp.now(), updatedBy: userId })
+    setData({ systemPrompt: draft, updatedAt: Timestamp.now(), updatedBy })
     setEditing(false)
     setSaving(false)
   }

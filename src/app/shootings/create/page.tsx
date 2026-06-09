@@ -84,6 +84,7 @@ export default function ShootingCreatePage() {
   const [photorealistic, setPhotorealistic] = useState(false)
   const [candidLook, setCandidLook] = useState(false)
   const [filmGrain, setFilmGrain] = useState(false)
+  const [aspectRatio, setAspectRatio] = useState<'4:5' | '9:16' | '16:9' | '1:1'>('4:5')
 
   // Generation state
   const [submitted, setSubmitted] = useState(false)
@@ -239,6 +240,7 @@ export default function ShootingCreatePage() {
         fotografieStil: fotografieStil || undefined, bildschaerfe: bildschaerfe || undefined,
         photorealistic: photorealistic || undefined, candidLook: candidLook || undefined, filmGrain: filmGrain || undefined,
       })),
+      aspectRatio,
       ...(refinement && { refinement }),
     }
   }
@@ -514,6 +516,7 @@ export default function ShootingCreatePage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            {/* Row 1: Posing-Typ | Arm- & Handhaltung */}
             <div className="space-y-1">
               <label className="text-sm text-navy/70">Posing-Typ</label>
               <select value={posingTyp} onChange={e => setPosingTyp(e.target.value)} className={selectCls}>
@@ -528,34 +531,7 @@ export default function ShootingCreatePage() {
                 {['Hands in pockets (Hände in den Taschen)','Natural relaxed arms (Locker fallend)','Holding a bag (Tasche haltend)'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm text-navy/70">Körperspannung &amp; Fluss</label>
-              <select value={koerperSpannung} onChange={e => setKoerperSpannung(e.target.value)} className={selectCls}>
-                <option value="">Keine Angabe</option>
-                {['Candid snapshot (Schnappschuss-Look)','Editorial pose','Catalog style (Klassisch gerade)'].map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-navy/70">Bildausschnitt</label>
-              <select value={bildausschnitt} onChange={e => setBildausschnitt(e.target.value)} className={selectCls}>
-                <option value="">Keine Angabe</option>
-                {['Full body shot (Ganzkörper)','Knee-up shot (Amerikanisch - ab Knie)','Medium shot (Hüfte aufwärts)','Close-up (Detail)'].map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-navy/70">Kamerawinkel</label>
-              <select value={kamerawinkel} onChange={e => setKamerawinkel(e.target.value)} className={selectCls}>
-                <option value="">Keine Angabe</option>
-                {['Eye-level (Augenhöhe)','Low-angle (Leichte Froschperspektive)','Straight-on (Frontal)'].map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-navy/70">Objektiv-Charakteristik</label>
-              <select value={objektivChar} onChange={e => setObjektivChar(e.target.value)} className={selectCls}>
-                <option value="">Keine Angabe</option>
-                {['85mm lens (Porträt, natürlicher Look)','50mm lens (Realistischer Blick)','35mm lens (Mehr Kontext/Hintergrund)'].map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
+            {/* Row 2: Blickkontakt | Gesichtsausdruck */}
             <div className="space-y-1">
               <label className="text-sm text-navy/70">Blickkontakt</label>
               <select value={blickkontakt} onChange={e => setBlickkontakt(e.target.value)} className={selectCls}>
@@ -570,11 +546,56 @@ export default function ShootingCreatePage() {
                 {['Soft subtle smile (Sanftes Schmunzeln)','Neutral expression (Neutral/High-End)','Friendly and approachable (Freundlich/Nahbar)'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
+            {/* Row 3: Körperspannung & Fluss | Stoff-Dynamik */}
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Körperspannung &amp; Fluss</label>
+              <select value={koerperSpannung} onChange={e => setKoerperSpannung(e.target.value)} className={selectCls}>
+                <option value="">Keine Angabe</option>
+                {['Candid snapshot (Schnappschuss-Look)','Editorial pose','Catalog style (Klassisch gerade)'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
             <div className="space-y-1">
               <label className="text-sm text-navy/70">Stoff-Dynamik</label>
               <select value={stoffDynamik} onChange={e => setStoffDynamik(e.target.value)} className={selectCls}>
                 <option value="">Keine Angabe</option>
                 {['Fabric blowing in the wind (Windhauch im Stoff)','Natural drapes (Natürlicher Faltenwurf)','Form-fitting (Eng anliegend, statisch)'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            {/* Row 4: Bildausschnitt | Kamerawinkel */}
+            <div className="col-span-2 mt-4" />
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Bildausschnitt</label>
+              <select value={bildausschnitt} onChange={e => setBildausschnitt(e.target.value)} className={selectCls}>
+                <option value="">Keine Angabe</option>
+                {['Full body shot (Ganzkörper)','Knee-up shot (Amerikanisch - ab Knie)','Medium shot (Hüfte aufwärts)','Close-up (Detail)'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Kamerawinkel</label>
+              <select value={kamerawinkel} onChange={e => setKamerawinkel(e.target.value)} className={selectCls}>
+                <option value="">Keine Angabe</option>
+                {['Eye-level (Augenhöhe)','Low-angle (Leichte Froschperspektive)','Straight-on (Frontal)'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            {/* Row 5: Bildschärfe & Hintergrund | Fokus-Bereich */}
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Bildschärfe &amp; Hintergrund</label>
+              <select value={bildschaerfe} onChange={e => setBildschaerfe(e.target.value)} className={selectCls}>
+                <option value="">Keine Angabe</option>
+                {['Shallow depth of field (Scharfes Model, unscharfer Hintergrund)','Sharp focus throughout (Alles scharf)'].map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Fokus-Bereich</label>
+              <input type="text" value={fokusBereich} onChange={e => setFokusBereich(e.target.value)}
+                placeholder='z. B. "Focus on the texture of the knitwear"' className={inputCls} />
+            </div>
+            {/* Row 6: Objektiv-Charakteristik | Fotografie-Stil */}
+            <div className="space-y-1">
+              <label className="text-sm text-navy/70">Objektiv-Charakteristik</label>
+              <select value={objektivChar} onChange={e => setObjektivChar(e.target.value)} className={selectCls}>
+                <option value="">Keine Angabe</option>
+                {['85mm lens (Porträt, natürlicher Look)','50mm lens (Realistischer Blick)','35mm lens (Mehr Kontext/Hintergrund)'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
             <div className="space-y-1">
@@ -583,18 +604,6 @@ export default function ShootingCreatePage() {
                 <option value="">Keine Angabe</option>
                 {['Commercial fashion photography','High-end e-commerce look','Street style photography'].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm text-navy/70">Bildschärfe &amp; Hintergrund</label>
-              <select value={bildschaerfe} onChange={e => setBildschaerfe(e.target.value)} className={selectCls}>
-                <option value="">Keine Angabe</option>
-                {['Shallow depth of field (Scharfes Model, unscharfer Hintergrund)','Sharp focus throughout (Alles scharf)'].map(v => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2 space-y-1">
-              <label className="text-sm text-navy/70">Fokus-Bereich</label>
-              <input type="text" value={fokusBereich} onChange={e => setFokusBereich(e.target.value)}
-                placeholder='z. B. "Focus on the texture of the knitwear"' className={inputCls} />
             </div>
           </div>
 
@@ -610,6 +619,19 @@ export default function ShootingCreatePage() {
                 <span className="text-sm text-navy">{label}</span>
               </label>
             ))}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex flex-col gap-1">
+            <span className="text-sm text-navy/70">Bildformat</span>
+            <select value={aspectRatio} onChange={e => setAspectRatio(e.target.value as typeof aspectRatio)}
+              className={`${selectCls} max-w-xs`}>
+              <option value="4:5">4:5 – Hochformat (Standard)</option>
+              <option value="9:16">9:16 – Story / Reels</option>
+              <option value="16:9">16:9 – Querformat</option>
+              <option value="1:1">1:1 – Quadrat</option>
+            </select>
+            </label>
           </div>
 
           <button type="button" onClick={handleStart} disabled={!canStart || generating}

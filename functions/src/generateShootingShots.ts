@@ -51,6 +51,7 @@ interface GenerateShootingShotsRequest {
   modelArtikel: ModelArtikelInput[];
   setting: { name: string; storagePath: string };
   regie: RegieInput;
+  aspectRatio?: string;
   refinement?: { storagePath: string; text: string };
 }
 
@@ -229,7 +230,7 @@ export const generateShootingShots = onCall({
           response = await ai.models.generateContent({
             model: 'gemini-3-pro-image-preview',
             contents,
-            config: { responseModalities: ['IMAGE'] },
+            config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: data.aspectRatio ?? '4:5' } },
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
