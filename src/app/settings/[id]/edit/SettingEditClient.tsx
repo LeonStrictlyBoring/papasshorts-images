@@ -1,7 +1,7 @@
 'use client'
 
-import { use, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
@@ -37,8 +37,9 @@ interface OriginalSetting {
   briefing?: Record<string, unknown>
 }
 
-export default function SettingEditClient({ params }: { params: Promise<{ id: string }> }) {
-  const { id: settingId } = use(params)
+export default function SettingEditClient() {
+  const pathname = usePathname()
+  const settingId = decodeURIComponent(pathname.split('/')[2] ?? '_')
   const router = useRouter()
   const { userDoc } = useAuth()
 
@@ -102,6 +103,7 @@ export default function SettingEditClient({ params }: { params: Promise<{ id: st
 
   // Load setting from Firestore and pre-fill form
   useEffect(() => {
+    if (settingId === '_') return
     async function load() {
       try {
         const snap = await getDoc(doc(db, 'settings', settingId))

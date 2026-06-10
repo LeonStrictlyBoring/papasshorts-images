@@ -1,8 +1,8 @@
 'use client'
 
-import { use, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { httpsCallable } from 'firebase/functions'
 import { collection, addDoc, doc, getDoc, Timestamp } from 'firebase/firestore'
 import { ref, getDownloadURL } from 'firebase/storage'
@@ -40,8 +40,9 @@ interface OriginalModel {
   }
 }
 
-export default function ModelEditClient({ params }: { params: Promise<{ id: string }> }) {
-  const { id: modelId } = use(params)
+export default function ModelEditClient() {
+  const pathname = usePathname()
+  const modelId = decodeURIComponent(pathname.split('/')[2] ?? '_')
   const router = useRouter()
   const { userDoc } = useAuth()
 
@@ -76,6 +77,7 @@ export default function ModelEditClient({ params }: { params: Promise<{ id: stri
   const resultsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (modelId === '_') return
     async function load() {
       try {
         const snap = await getDoc(doc(db, 'models', modelId))

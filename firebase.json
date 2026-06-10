@@ -31,10 +31,8 @@
       "**/node_modules/**"
     ],
     "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
+      { "source": "/models/*/edit", "destination": "/models/_/edit.html" },
+      { "source": "/settings/*/edit", "destination": "/settings/_/edit.html" }
     ]
   },
   "storage": {
