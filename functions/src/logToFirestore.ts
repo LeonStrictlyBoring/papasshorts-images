@@ -7,6 +7,7 @@ interface ErrorLogEntry {
   message: string;
   errString: string;
   severity: 'error' | 'warn';
+  code?: string;
 }
 
 export async function writeErrorLog(entry: ErrorLogEntry): Promise<void> {

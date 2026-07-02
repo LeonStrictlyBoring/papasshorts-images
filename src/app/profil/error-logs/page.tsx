@@ -15,6 +15,7 @@ interface ErrorLog {
   message: string
   errString: string
   severity: 'error' | 'warn'
+  code?: string
 }
 
 function formatDate(ts: Timestamp): string {
@@ -69,10 +70,11 @@ export default function ErrorLogsPage() {
   }, [logs, filterFlow, filterSeverity, filterFrom, filterTo])
 
   function exportCsv() {
-    const header = ['Timestamp', 'Severity', 'Flow', 'Fehlertyp', 'Meldung', 'UserID', 'Detail']
+    const header = ['Timestamp', 'Severity', 'Code', 'Flow', 'Fehlertyp', 'Meldung', 'UserID', 'Detail']
     const rows = filtered.map(l => [
       formatDate(l.timestamp),
       l.severity,
+      l.code ?? '',
       l.flow,
       l.errorType,
       `"${l.message.replace(/"/g, '""')}"`,
@@ -164,6 +166,7 @@ export default function ErrorLogsPage() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50 whitespace-nowrap">Zeitpunkt</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50">Severity</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50">Code</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50">Flow</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50">Fehlertyp</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-navy/50">Meldung</th>
@@ -179,6 +182,7 @@ export default function ErrorLogsPage() {
                       {log.severity.toUpperCase()}
                     </span>
                   </td>
+                  <td className="px-3 py-3 text-navy/70 font-mono text-xs">{log.code ?? '—'}</td>
                   <td className="px-3 py-3 text-navy/70 font-mono text-xs">{log.flow}</td>
                   <td className="px-3 py-3 text-navy/70 font-mono text-xs">{log.errorType}</td>
                   <td className="px-4 py-3 text-navy max-w-xs">

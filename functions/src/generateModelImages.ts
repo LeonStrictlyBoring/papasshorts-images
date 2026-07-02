@@ -110,7 +110,7 @@ export const generateModelImages = onCall({
     promptDoc = await getFirestore().collection('prompts').doc('model-creation').get();
   } catch (err) {
     logger.error('Firestore-Fehler beim Lesen des System-Prompts', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
-    await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Firestore-Fehler beim Lesen des System-Prompts', errString: String(err), severity: 'error' });
+    await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Firestore-Fehler beim Lesen des System-Prompts', errString: String(err), severity: 'error', code: 'internal' });
     throw new HttpsError('internal', 'Datenbankfehler beim Laden des System-Prompts', { httpStatus: 500, source: 'Firestore' });
   }
   if (!promptDoc.exists) {
@@ -141,7 +141,7 @@ export const generateModelImages = onCall({
       };
     } catch (err) {
       logger.error('Storage-Fehler beim Laden des Referenzbildes', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, errString: String(err) });
-      await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Storage-Fehler beim Laden des Referenzbildes', errString: String(err), severity: 'error' });
+      await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: 'Storage-Fehler beim Laden des Referenzbildes', errString: String(err), severity: 'error', code: 'internal' });
       throw new HttpsError('internal', 'Referenzbild konnte nicht geladen werden', { httpStatus: 500, source: 'Storage' });
     }
   }
@@ -159,14 +159,13 @@ export const generateModelImages = onCall({
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const code = message.includes('quota') || message.includes('RESOURCE_EXHAUSTED') ? 'resource-exhausted'
+      : message.includes('UNAVAILABLE') || message.includes('high demand') ? 'unavailable'
+      : 'internal';
     logger.error('Gemini API Fehler', { flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message, errString: String(err) });
-    await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: `Gemini API Fehler: ${message}`, errString: String(err), severity: 'error' });
-    if (message.includes('quota') || message.includes('RESOURCE_EXHAUSTED')) {
-      throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
-    }
-    if (message.includes('UNAVAILABLE') || message.includes('high demand')) {
-      throw new HttpsError('unavailable', 'Gemini API vorübergehend nicht erreichbar', { httpStatus: 503, source: 'Gemini' });
-    }
+    await writeErrorLog({ flow: 'model', userId: request.auth.uid, errorType: err instanceof Error ? err.constructor.name : typeof err, message: `Gemini API Fehler: ${message}`, errString: String(err), severity: 'error', code });
+    if (code === 'resource-exhausted') throw new HttpsError('resource-exhausted', 'Gemini API Quota überschritten', { httpStatus: 429, source: 'Gemini' });
+    if (code === 'unavailable') throw new HttpsError('unavailable', 'Gemini API vorübergehend nicht erreichbar', { httpStatus: 503, source: 'Gemini' });
     throw new HttpsError('internal', 'Bildgenerierung fehlgeschlagen', { httpStatus: 500, source: 'Gemini' });
   }
 

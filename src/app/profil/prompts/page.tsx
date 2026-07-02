@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase'
 import { useAuth } from '@/lib/useAuth'
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore'
 
-type PromptId = 'model-creation' | 'setting-creation' | 'shooting-creation'
+type PromptId = 'model-creation' | 'setting-creation' | 'setting-from-photo' | 'shooting-creation'
 
 interface PromptData {
   systemPrompt: string
@@ -71,6 +71,13 @@ const PROMPTS: { id: PromptId; label: string; placeholders?: Placeholder[] }[] =
       { key: '{{kleindekoration}}',   description: 'Kleindekoration & organische Elemente' },
       { key: '{{stilrichtung}}',      description: 'Stilrichtung / Ära' },
       { key: '{{mood_adjektive}}',    description: 'Mood-Adjektive, kommagetrennt' },
+    ],
+  },
+  {
+    id: 'setting-from-photo',
+    label: 'Setting von Foto',
+    placeholders: [
+      { key: '{{anpassungen}}', description: 'Freitext-Beschreibung der gewünschten Anpassungen am Setting' },
     ],
   },
   {

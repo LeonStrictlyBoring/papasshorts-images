@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { label: 'Artikel', href: '/artikel' },
   { label: 'Settings', href: '/settings' },
   { label: 'Setting erstellen', href: '/settings/create', indent: true, visibleWhen: '/settings' },
+  { label: 'Setting von Foto', href: '/settings/from-photo', indent: true, visibleWhen: '/settings' },
   { label: 'Shootings', href: '/shootings' },
   { label: 'Shooting erstellen', href: '/shootings/create', indent: true, visibleWhen: '/shootings' },
   { label: 'Profil', href: '/profil' },

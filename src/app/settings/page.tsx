@@ -143,10 +143,16 @@ export default function SettingsPage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-navy">Settings</h1>
-        <Link href="/settings/create"
-          className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors">
-          + Setting erstellen
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/settings/create"
+            className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors">
+            + Setting erstellen
+          </Link>
+          <Link href="/settings/from-photo"
+            className="flex items-center gap-2 bg-orange text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-orange/90 transition-colors">
+            + Setting von Foto
+          </Link>
+        </div>
       </div>
 
       {/* Filter bar */}

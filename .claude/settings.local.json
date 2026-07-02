@@ -18,7 +18,31 @@
       "Bash(find D:\\\\\\\\01_Prodct Group\\\\\\\\01_Prodct Dev\\\\\\\\Papasshorts\\\\\\\\papasshorts-images *)",
       "Bash(ls *)",
       "Bash(find \"D:\\\\\\\\01_Prodct Group\\\\\\\\01_Prodct Dev\\\\\\\\Papasshorts\\\\\\\\papasshorts-images/src\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\))",
-      "Bash(xargs grep -l \"Model\")"
+      "Bash(xargs grep -l \"Model\")",
+      "mcp__claude_ai_Atlassian__editJiraIssue",
+      "mcp__claude_ai_Atlassian__createJiraIssue",
+      "Bash(firebase deploy *)",
+      "Bash(npx tsc *)",
+      "mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql",
+      "mcp__claude_ai_Atlassian__getIssueLinkTypes",
+      "mcp__claude_ai_Atlassian__createIssueLink",
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:support.google.com)",
+      "WebFetch(domain:discuss.ai.google.dev)",
+      "Bash(npm run *)",
+      "Bash(firebase functions:delete setupSettingPrompt --region europe-west3 --force)",
+      "Bash(del *)",
+      "mcp__claude_ai_Atlassian__updateConfluencePage",
+      "Bash(Get-ChildItem -Path \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papassshorts-images\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20 FullName)",
+      "Bash(Get-ChildItem -Recurse \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\\\\src\\\\app\\\\models\")",
+      "Bash(Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"D:\\\\01_Prodct Group\\\\01_Prodct Dev\\\\Papasshorts\\\\papasshorts-images\\\\src\" -Recurse -File -Include \"*.tsx\", \"*.ts\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Test-Path *)"
     ]
   }
 }
