@@ -232,7 +232,7 @@ export const generateShootingShots = onCall({
           response = await ai.models.generateContent({
             model: 'gemini-3-pro-image-preview',
             contents,
-            config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: data.aspectRatio ?? '4:5' } },
+            config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: data.aspectRatio ?? '4:5', imageSize: '4K' } },
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
